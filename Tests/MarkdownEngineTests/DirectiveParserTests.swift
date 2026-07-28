@@ -153,6 +153,24 @@ struct DirectiveParserTests {
         #expect(ids("v2@marker").isEmpty)
     }
 
+    @Test("markup delimiters are boundaries — a directive can abut emphasis")
+    func acceptsMarkupBoundaries() {
+        // Regression: an allow-list of "opening punctuation" silently dropped
+        // every one of these, because the preceding character is a markup
+        // delimiter. Only word characters may reject.
+        #expect(ids("*@font(size: 18){x}*") == ["font"])
+        #expect(ids("**@font(size: 18){x}**") == ["font"])
+        #expect(ids("_@font(size: 18){x}_") == ["font"])
+        #expect(ids("- @pagebreak") == ["pagebreak"])
+        #expect(ids("1. @pagebreak") == ["pagebreak"])
+        #expect(ids("#@pagebreak") == ["pagebreak"])
+    }
+
+    @Test("a digit is a word character, so it rejects")
+    func rejectsAfterDigit() {
+        #expect(ids("v2@pagebreak").isEmpty)
+    }
+
     @Test("an escaped marker stays literal")
     func rejectsEscapedMarker() {
         #expect(ids("\\@marker").isEmpty)
