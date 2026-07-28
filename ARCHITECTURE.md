@@ -138,6 +138,30 @@ or opening punctuation), so `name@example.com` never opens one.
 unbalanced or multi-line run — leaves the candidate literal. Nothing here can
 produce a partial construct.
 
+### Autocomplete
+
+`DirectiveCompletionScanner` answers "what is the caret completing?" — a
+directive NAME (`@fo|`) or one of its ARGUMENT VALUES (`@icon(sta|`). It cannot
+use the AST: mid-typing, `@ico` and `@icon(sta` are precisely what the parser
+REJECTS, so it is a separate, forgiving backwards scan over the current line,
+bounded to 256 characters per caret move.
+
+The engine owns the CANDIDATES because it owns the registry — names come from
+the registered directives, values from `MarkdownDirective.valueCompletions`,
+whose default answers whatever the declared schema can (closed keyword sets,
+booleans). A directive only implements it when its domain is dynamic or too
+large to declare, which is how `@flag` offers every ISO region without shipping
+a dataset. A newly registered directive therefore appears in the picker with no
+embedder change.
+
+The engine ships **no picker UI**, exactly as for `[[wiki-links]]`: it publishes
+the context through `onDirectiveCompletion`, reports the anchor via
+`onCaretRectChange`, routes ↑/↓/↵/Esc through `onInlinePreviewKey`, and applies
+a pick pushed into `pendingDirectiveCompletion`. Detection and commit live in
+`Coordinator/NativeTextViewCoordinator+Directives.swift`; the commit path is
+deliberately separate from `applyInlineReplacement`, which runs the wiki-link
+storage/display transform.
+
 ## [`Services/`](Sources/MarkdownEngine/Services): how does the engine talk to your app?
 
 `MarkdownEditorServices.swift` declares the four service protocols. Each is

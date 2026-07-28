@@ -92,6 +92,14 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Fires on ↑/↓/Enter/Esc while an inline `[[…]]` preview is open, so the
     /// embedder can drive its autocomplete list. Return `true` to consume the key.
     public var onInlinePreviewKey: ((InlinePreviewKey) -> Bool)?
+    /// Fires when the caret's directive-completion context changes — entering
+    /// a directive name or one of its arguments — and with `nil` to dismiss.
+    /// The engine supplies the ranked candidates; the embedder draws the list
+    /// and routes keys back through ``onInlinePreviewKey``.
+    public var onDirectiveCompletion: ((DirectiveCompletionContext?) -> Void)?
+    /// Commit a picked directive completion. The engine applies it, places the
+    /// caret, and clears the binding.
+    @Binding public var pendingDirectiveCompletion: DirectiveCompletionRequest?
     /// Fires when the set of visible code blocks changes, so embedders can
     /// overlay copy buttons (see ``CodeBlockButton``).
     public var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
@@ -143,6 +151,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)? = nil,
         onInlineSelectionChange: ((InlineSelectionState?) -> Void)? = nil,
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
+        onDirectiveCompletion: ((DirectiveCompletionContext?) -> Void)? = nil,
+        pendingDirectiveCompletion: Binding<DirectiveCompletionRequest?> = .constant(nil),
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
         placeholder: NSAttributedString? = nil,
@@ -166,6 +176,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onBuildContextMenu = onBuildContextMenu
         self.onInlineSelectionChange = onInlineSelectionChange
         self.onInlinePreviewKey = onInlinePreviewKey
+        self.onDirectiveCompletion = onDirectiveCompletion
+        self._pendingDirectiveCompletion = pendingDirectiveCompletion
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
         self.placeholder = placeholder
@@ -313,6 +325,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onBuildContextMenu = onBuildContextMenu
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
+        context.coordinator.onDirectiveCompletion = onDirectiveCompletion
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
 
         textView.recalcOverscroll(for: scrollView)
@@ -531,6 +544,18 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             ? (context.coordinator.resolvedCaretColor ?? context.coordinator.configuration.theme.bodyText)
             : .clear
         let fontChanged = (context.coordinator.fontName != fontName) || (context.coordinator.fontSize != fontSize)
+        if let pendingDirectiveCompletion {
+            if pendingDirectiveCompletion.documentId == documentId,
+               context.coordinator.lastAppliedDirectiveCompletionID != pendingDirectiveCompletion.id {
+                context.coordinator.applyDirectiveCompletion(pendingDirectiveCompletion, to: textView)
+            }
+            DispatchQueue.main.async {
+                if self.pendingDirectiveCompletion?.id == pendingDirectiveCompletion.id {
+                    self.pendingDirectiveCompletion = nil
+                }
+            }
+            return
+        }
         if let pendingInlineReplacement {
             if pendingInlineReplacement.documentId == documentId,
                context.coordinator.lastAppliedInlineReplacementID != pendingInlineReplacement.id {
@@ -627,6 +652,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onBuildContextMenu = onBuildContextMenu
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
+        context.coordinator.onDirectiveCompletion = onDirectiveCompletion
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         context.coordinator.didInitialFormatting = true
     }
@@ -646,6 +672,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         coordinator.lastWikiFingerprint = configuration.services.wikiLinks.fingerprint()
         coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         coordinator.onInlinePreviewKey = onInlinePreviewKey
+        coordinator.onDirectiveCompletion = onDirectiveCompletion
         coordinator.userPrefersContinuousSpellChecking = configuration.spellChecking.continuousSpellChecking
         coordinator.userPrefersGrammarChecking = configuration.spellChecking.grammarChecking
         coordinator.userPrefersAutomaticSpellingCorrection = configuration.spellChecking.automaticSpellingCorrection
