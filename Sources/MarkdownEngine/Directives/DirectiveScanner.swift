@@ -64,9 +64,10 @@ enum DirectiveScanner {
         let marker = ns.character(at: i)
         guard let table = registry.byMarker[marker], !table.isEmpty else { return nil }
 
-        // Left boundary: start-of-line, whitespace, or opening punctuation.
-        // `name@example.com` therefore never opens a directive, and a `@@` run
-        // stays literal (mirrors `InlineSyntax.rejectsOpenerRun`).
+        // Left boundary: anything that isn't a word character. Markup
+        // delimiters therefore open directives (`*@font(size: 18){x}*`), while
+        // `name@example.com` never does, and a `@@` run stays literal
+        // (mirrors `InlineSyntax.rejectsOpenerRun`).
         if i > 0 {
             let previous = ns.character(at: i - 1)
             guard previous != marker, isBoundary(previous) else { return nil }
@@ -154,6 +155,23 @@ enum DirectiveScanner {
         )
     }
 
+    /// Recover the argument range from a directive node's PREFIX marker
+    /// (`@font(size: 18){`, or the whole call when self-contained).
+    ///
+    /// The AST carries directives as extension-shaped nodes, which have no
+    /// slot for an argument range, so styling recovers it from the geometry
+    /// the parser already emitted. The prefix is well-formed by construction —
+    /// this scanner produced it — so the walk is a short, total re-derivation
+    /// rather than a second parse of the document.
+    static func argumentsRange(inPrefix prefix: NSRange, of ns: NSString) -> NSRange? {
+        let end = min(NSMaxRange(prefix), ns.length)
+        var k = prefix.location + 1                    // past the marker
+        while k < end, isIdentChar(ns.character(at: k)) || ns.character(at: k) == dot { k += 1 }
+        guard k < end, ns.character(at: k) == lparen else { return nil }
+        guard let close = balanced(ns, len: end, from: k + 1, open: lparen, close: rparen) else { return nil }
+        return NSRange(location: k + 1, length: close - (k + 1))
+    }
+
     // MARK: - Character classes
 
     /// `[A-Za-z_]`
@@ -166,17 +184,21 @@ enum DirectiveScanner {
         isIdentStart(c) || (c >= 0x30 && c <= 0x39) || c == 0x2D
     }
 
-    /// Characters a directive may open after: whitespace, line breaks, and
-    /// opening punctuation. Anything alphanumeric rejects — the email rule.
+    /// Whether a directive may open after `c`.
+    ///
+    /// Stated as a DENY list — only letters and digits reject — rather than an
+    /// allow list of punctuation. An allow list looks safer and is wrong: it
+    /// silently breaks every markup context that abuts a directive
+    /// (`*@font(size: 18){x}*`, `**…**`, `~~…~~`, `- @pagebreak`), because the
+    /// preceding character is a markup delimiter nobody remembered to list.
+    ///
+    /// Rejecting word characters is all the email rule needs:
+    /// `name@example.com` is preceded by `e`. Underscore is deliberately a
+    /// boundary so `_@font(size: 18){x}_` works; `foo_@example.com` is not a
+    /// shape worth protecting, and the name still has to be registered.
     private static func isBoundary(_ c: unichar) -> Bool {
-        switch c {
-        case 0x20, 0x09, 0x0A, 0x0D:            return true   // space tab \n \r
-        case 0x28, 0x5B, 0x7B, 0x3C:            return true   // ( [ { <
-        case 0x22, 0x27:                        return true   // " '
-        case 0x2013, 0x2014, 0x201C, 0x2018:    return true   // – — “ ‘
-        case 0x3E:                              return true   // > blockquote marker
-        default:                                return false
-        }
+        guard let scalar = UnicodeScalar(c) else { return true }   // surrogate half
+        return !CharacterSet.alphanumerics.contains(scalar)
     }
 
     // MARK: - Scanning helpers
