@@ -88,6 +88,26 @@ public struct FontDirective: MarkdownDirective {
     }
 }
 
+// MARK: - Shared colour resolution
+
+/// Standard colour names resolved without an asset catalog, so
+/// `@color(red){…}` and `@icon(star, color: yellow)` work out of the box. An
+/// unlisted name falls back to `NSColor(named:)`, so an embedder's own palette
+/// entries keep working.
+enum DirectivePalette {
+    static let named: [String: NSColor] = [
+        "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow,
+        "green": .systemGreen, "mint": .systemMint, "teal": .systemTeal,
+        "cyan": .systemCyan, "blue": .systemBlue, "indigo": .systemIndigo,
+        "purple": .systemPurple, "pink": .systemPink, "brown": .systemBrown,
+        "gray": .systemGray, "grey": .systemGray,
+    ]
+
+    static func color(_ name: String) -> NSColor? {
+        named[name.lowercased()] ?? NSColor(named: name)
+    }
+}
+
 // MARK: - @color(red){…}  — container, positional argument
 
 public struct ColorDirective: MarkdownDirective {
@@ -97,17 +117,6 @@ public struct ColorDirective: MarkdownDirective {
     public init() {}
 
     public var id: String { Self.identifier }
-
-    /// Standard colour names, resolved without an asset catalog so
-    /// `@color(red){…}` works out of the box. An unlisted name falls back to
-    /// `NSColor(named:)`, so embedders can add their own palette entries.
-    private static let named: [String: NSColor] = [
-        "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow,
-        "green": .systemGreen, "mint": .systemMint, "teal": .systemTeal,
-        "cyan": .systemCyan, "blue": .systemBlue, "indigo": .systemIndigo,
-        "purple": .systemPurple, "pink": .systemPink, "brown": .systemBrown,
-        "gray": .systemGray, "grey": .systemGray,
-    ]
 
     public var syntax: DirectiveSyntax {
         DirectiveSyntax(
@@ -138,13 +147,65 @@ public struct ColorDirective: MarkdownDirective {
         guard let name = arguments.positional.first?.asString else { return .inherit }
         // An unresolvable name leaves the body alone rather than guessing —
         // the source stays readable and the mistake is visible.
-        guard let color = Self.named[name.lowercased()] ?? NSColor(named: name) else { return .inherit }
+        guard let color = DirectivePalette.color(name) else { return .inherit }
         return DirectiveStyle(attributes: [.foregroundColor: color])
     }
 
     public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
         guard let name = arguments.positional.first?.asString else { return bodyHTML }
         return "<span style=\"color:\(name)\">\(bodyHTML)</span>"
+    }
+}
+
+// MARK: - @icon(star.fill, color: yellow) — self-contained, glyph from arguments
+
+/// An SF Symbol drawn inline, sized to the surrounding text.
+///
+/// The counterpart to `@font` for the self-contained form: where a container
+/// directive transforms its body, this one replaces its own source with a
+/// glyph — and its arguments decide what that glyph is.
+public struct IconDirective: MarkdownDirective {
+
+    public static let identifier = "icon"
+
+    public init() {}
+
+    public var id: String { Self.identifier }
+
+    public var syntax: DirectiveSyntax {
+        DirectiveSyntax(
+            name: Self.identifier,
+            form: .selfContained,
+            parameters: [
+                .init(label: nil, kind: .keyword([]), isRequired: true,
+                      documentation: "SF Symbol name, e.g. star.fill."),
+                .init(label: "color", kind: .keyword([]),
+                      documentation: "Standard colour name, or one from your asset catalog."),
+            ]
+        )
+    }
+
+    public var completion: DirectiveCompletion {
+        DirectiveCompletion(
+            id: id,
+            title: "icon",
+            subtitle: "Draw an SF Symbol inline",
+            keywords: ["symbol", "glyph", "image"],
+            snippet: "@icon(|)",
+            symbolName: "star"
+        )
+    }
+
+    public func presentation(arguments: DirectiveArguments, context: DirectiveContext) -> DirectivePresentation {
+        // Revealed source while the caret is inside; an unknown symbol name
+        // falls back to the source too, so a typo stays visible and fixable.
+        guard !context.isActive, let name = arguments.positional.first?.asString else { return .literal }
+        return .symbol(name: name, tint: arguments.string("color").flatMap(DirectivePalette.color))
+    }
+
+    public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
+        let name = arguments.positional.first?.asString ?? ""
+        return "<span class=\"icon\" data-symbol=\"\(name)\"></span>"
     }
 }
 

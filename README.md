@@ -149,17 +149,20 @@ rather than delimiters:
 
 ```swift
 var config = MarkdownEditorConfiguration()
-config.directives = [FontDirective(), ColorDirective()]
+config.directives = [FontDirective(), ColorDirective(), IconDirective(), PageBreakDirective()]
 ```
 
 ```markdown
-@font(size: 18){eighteen point}, @font(size: 1.5em){half again}, @color(red){tinted}
+@font(size: 18){eighteen point}, @font(size: 1.5em){half again},
+@color(red){tinted}, and @icon(star.fill, color: yellow)
 ```
 
-Two forms: **self-contained** (`@pagebreak`) and **container**
-(`@font(size: 18){text}`). A container's font transform composes over the font
-inherited at that point in the tree, so `@font(size: 18){**bold**}` is bold
-*and* 18pt, and the same call inside a heading keeps the heading's weight.
+Two forms: **container** (`@font(size: 18){text}`) transforms its body;
+**self-contained** (`@icon(star.fill)`) draws a glyph in place of its own
+source, sized to the surrounding text. A container's font transform composes
+over the font inherited at that point in the tree, so `@font(size: 18){**bold**}`
+is bold *and* 18pt, and the same call inside a heading keeps the heading's
+weight.
 There is no "applies to everything after me" form — a directive's effect is
 scoped to its own node, which is what keeps per-keystroke restyling
 block-local.
