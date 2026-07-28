@@ -355,7 +355,8 @@ private let directiveSection = """
 The other opt-in seam: named inline commands with typed arguments, for \
 constructs that need a name and parameters rather than delimiters. \
 Unregistered, `@anything` stays literal text — and a bare `@` in prose or an \
-address like jason@wildthink.com never opens one.
+address like jason@example
+.com never opens one.
 
 Sizes can be absolute — @font(size: 24){twenty-four point} — or relative to the \
 surrounding text: @font(size: 0.75em){three-quarter em} and @font(size: 150%){one-and-a-half}.

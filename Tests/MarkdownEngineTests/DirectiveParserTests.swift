@@ -120,7 +120,7 @@ struct DirectiveParserTests {
     @Test("an email address never opens a directive")
     func rejectsEmail() {
         // `wildthink` IS registered — only the boundary rule saves this.
-        #expect(ids("mail jason@wildthink.com now").isEmpty)
+        #expect(ids("mail jason@example.com now").isEmpty)
     }
 
     @Test("a marker run stays literal")

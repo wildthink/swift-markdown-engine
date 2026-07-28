@@ -176,7 +176,7 @@ struct DirectiveCompletionTests {
 
     @Test("an email address does not open a picker")
     func emailOffersNothing() {
-        #expect(context("jason@wildthink|") == nil)
+        #expect(context("jason@example|") == nil)
     }
 
     @Test("a marker run does not open a picker")
