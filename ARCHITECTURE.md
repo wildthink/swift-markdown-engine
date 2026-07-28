@@ -97,7 +97,12 @@ so `\`-flavored commands can coexist.
 Two forms, both **tree-shaped** — a directive's effect never escapes its own
 node:
 
-- **self-contained** — `@pagebreak`. A leaf.
+- **self-contained** — `@pagebreak`, `@icon(star.fill, color: yellow)`. A leaf
+  that draws a glyph in place of its collapsed source, on the same mechanism
+  inline LaTeX uses: the characters stay in the text, the first one carries the
+  image and enough kern to occupy its width, the rest collapse. A glyph that
+  can't be produced (unknown SF Symbol, `.literal`) leaves the source visible
+  rather than collapsing it to a gap the user can't see or fix.
 - **container** — `@font(size: 18){text}`. The body is re-parsed as markdown and
   styled with the directive's font transform composed over the inherited font,
   so `@font(size: 18){**bold**}` is bold *and* 18pt.

@@ -55,8 +55,20 @@ extension MarkdownASTStyler {
             marker: marker
         )
 
-        // A self-contained call is the whole node — no body to style.
-        guard !node.markers.isEmpty, node.contentRange.length > 0 else { return font }
+        // A self-contained call is the whole node — no body to style, but it
+        // may draw a glyph in place of its collapsed source.
+        guard !node.markers.isEmpty, node.contentRange.length > 0 else {
+            let arguments = DirectiveArguments(
+                parsing: DirectiveScanner.argumentsRange(inPrefix: node.range, of: ctx.ns),
+                in: ctx.ns,
+                schema: directive.syntax.parameters
+            )
+            presentSelfContained(
+                directive.presentation(arguments: arguments, context: context),
+                node: node, font: font, isActive: context.isActive, ctx: ctx, into: &attrs
+            )
+            return font
+        }
 
         let arguments = DirectiveArguments(
             parsing: DirectiveScanner.argumentsRange(inPrefix: node.markers[0], of: ctx.ns),
@@ -73,6 +85,94 @@ extension MarkdownASTStyler {
         // it explicitly, so a later pass can't leave part of the span on a
         // stale font.
         attrs.append((node.contentRange, [.font: bodyFont]))
+        // Directive syntax is not prose — no spell-check underlines on it.
+        for marker in node.markers { attrs.append((marker, [.spellingState: 0])) }
         return bodyFont
+    }
+
+    // MARK: - Self-contained presentation
+
+    /// Draw a self-contained directive's glyph in place of its source.
+    ///
+    /// Mechanically identical to inline LaTeX
+    /// (`MarkdownStyler+Latex.swift`): the source text is never removed — it
+    /// collapses to zero width via clear colour, the shrunk marker font, and
+    /// negative kern, while the FIRST character carries the image plus enough
+    /// positive kern to occupy the glyph's width. `MarkdownTextLayoutFragment`
+    /// draws it. Selection, find, copy, and undo all still see the real
+    /// characters, which is what the "markers shrink, they don't disappear"
+    /// invariant is protecting.
+    ///
+    /// With the caret inside, the source is revealed muted instead — the same
+    /// flip every other construct performs.
+    private static func presentSelfContained(
+        _ presentation: DirectivePresentation,
+        node: ExtensionInlineNode,
+        font: NSFont,
+        isActive: Bool,
+        ctx: Ctx,
+        into attrs: inout [StyledRange]
+    ) {
+        attrs.append((node.range, [.spellingState: 0]))
+
+        guard !isActive else {
+            attrs.append((node.range, [.foregroundColor: ctx.theme.mutedText]))
+            return
+        }
+
+        let resolved: (image: NSImage, descent: CGFloat)?
+        switch presentation {
+        case .literal:
+            resolved = nil
+        case .symbol(let name, let tint):
+            resolved = symbolImage(named: name, tint: tint, font: font).map { image in
+                // Optically centre the glyph on the text's x-height:
+                // `descent` is how far the image's bottom sits below the
+                // baseline, so centring wants (height - xHeight) / 2.
+                (image, (image.size.height - font.xHeight) / 2)
+            }
+        case .image(let image, let baselineOffset):
+            resolved = (image, baselineOffset)
+        }
+
+        // `.literal`, or a symbol name the system doesn't know: leave the
+        // source visible rather than collapsing it to nothing.
+        guard let resolved, node.range.length > 0 else { return }
+
+        let markerFont = ctx.inlineMarkerFont
+        let imageBounds = CGRect(x: 0, y: resolved.descent,
+                                 width: resolved.image.size.width, height: resolved.image.size.height)
+
+        let firstCharRange = NSRange(location: node.range.location, length: 1)
+        let firstChar = ctx.ns.substring(with: firstCharRange)
+        attrs.append((firstCharRange, [
+            .latexImage: resolved.image,          // the engine's generic inline-image
+            .latexBounds: NSValue(rect: imageBounds),   // channel; the name is historical
+            .foregroundColor: NSColor.clear,
+            .font: markerFont,
+            .kern: resolved.image.size.width - HeadingHelpers.textWidth(firstChar, font: markerFont),
+        ]))
+
+        if node.range.length > 1 {
+            let restRange = NSRange(location: node.range.location + 1, length: node.range.length - 1)
+            let restText = ctx.ns.substring(with: restRange)
+            attrs.append((restRange, [
+                .foregroundColor: NSColor.clear,
+                .font: markerFont,
+                .kern: -HeadingHelpers.textWidth(restText, font: markerFont),
+            ]))
+        }
+    }
+
+    /// An SF Symbol sized to the inherited font, optionally tinted. `nil` when
+    /// the system doesn't know the name — the caller then leaves the source
+    /// visible instead of collapsing it to an empty gap.
+    private static func symbolImage(named name: String, tint: NSColor?, font: NSFont) -> NSImage? {
+        var configuration = NSImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
+        if let tint {
+            configuration = configuration.applying(NSImage.SymbolConfiguration(paletteColors: [tint]))
+        }
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
     }
 }

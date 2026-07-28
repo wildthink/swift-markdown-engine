@@ -155,7 +155,7 @@ struct ContentView: View {
         // for constructs that need a name and parameters rather than
         // delimiters. The marker defaults to `@` and is configurable via
         // `config.directiveSettings`.
-        config.directives = [FontDirective(), ColorDirective()]
+        config.directives = [FontDirective(), ColorDirective(), IconDirective(), PageBreakDirective()]
 
         // Toolbar-driven modes.
         config.rawSourceMode = showRawSource
@@ -257,8 +257,16 @@ the directive keeps its context — the same call in a heading stays bold:
 Colours work the same way, and directives nest: @color(red){red text}, \
 @color(blue){blue text}, and @font(size: 22){@color(purple){big and purple}}.
 
+The other form is self-contained: no body, and it draws a glyph in place of \
+its own source. @icon(star.fill, color: yellow) marks a favourite, \
+@icon(checkmark.circle.fill, color: green) a finished item, \
+@icon(exclamationmark.triangle.fill, color: orange) a warning — sized to \
+whatever text surrounds them, so @font(size: 26){they grow too: @icon(bolt.fill, color: blue)}.
+
 Put the caret inside any directive to reveal its source; move away and the \
-syntax collapses back to just the styled text — exactly like every other marker.
+syntax collapses back to just the styled text or the glyph — exactly like \
+every other marker. The characters are never deleted, so selection, find, \
+copy, and undo all still see them.
 """
 
 /// Table layout demo: the first table's cells WRAP to the available width
