@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Directive seam**: opt-in named inline commands with typed arguments, for
+  constructs that need a name and parameters rather than delimiters. A
+  `MarkdownDirective` declares a name, a form — self-contained (`@pagebreak`)
+  or container (`@font(size: 18){text}`) — and a parameter schema; register
+  instances via `MarkdownEditorConfiguration.directives`. A container's font
+  transform composes over the font inherited at that point in the tree, so
+  `@font(size: 18){**bold**}` is bold *and* 18pt; a self-contained call draws a
+  glyph in place of its collapsed source. Directives never emit ranges, project
+  into the AST as extension-shaped nodes, and fold into the existing grammar
+  fingerprint, so marker shrink, caret reveal, incremental restyle, and rich
+  copy are handled generically. The marker defaults to `@` and is configurable
+  per registry and per directive; unregistered names stay literal text.
+- Directive autocomplete for both names and argument values, riding the
+  existing inline-preview seam (`onDirectiveCompletion`,
+  `pendingDirectiveCompletion`); the engine ranks candidates from the registry
+  and the directive's own `valueCompletions`, and ships no picker UI.
+- `FontDirective` and `ColorDirective` as opt-in reference directives (off by
+  default, like the bundled extensions). Directives that carry curated data or
+  document policy are app concerns; `Demo/` shows `@icon`, `@flag`, `@emoji`,
+  and `@pagebreak` as embedder-side examples.
 - `NativeTextViewWrapper.onTextMutation` reports exact, completed native edits
   for embedders that maintain their own source authority or mirror edits into
   another presentation.
