@@ -98,13 +98,27 @@ public struct ColorDirective: MarkdownDirective {
 
     public var id: String { Self.identifier }
 
+    /// Standard colour names, resolved without an asset catalog so
+    /// `@color(red){…}` works out of the box. An unlisted name falls back to
+    /// `NSColor(named:)`, so embedders can add their own palette entries.
+    private static let named: [String: NSColor] = [
+        "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow,
+        "green": .systemGreen, "mint": .systemMint, "teal": .systemTeal,
+        "cyan": .systemCyan, "blue": .systemBlue, "indigo": .systemIndigo,
+        "purple": .systemPurple, "pink": .systemPink, "brown": .systemBrown,
+        "gray": .systemGray, "grey": .systemGray,
+    ]
+
     public var syntax: DirectiveSyntax {
         DirectiveSyntax(
             name: Self.identifier,
             form: .container,
             parameters: [
+                // Open set, not closed: the schema can't know the embedder's
+                // asset-catalog names, so resolution (and failure) belongs in
+                // `style`, not in argument coercion.
                 .init(label: nil, kind: .keyword([]), isRequired: true,
-                      documentation: "Colour name from the asset catalog."),
+                      documentation: "Standard colour name, or a name from your asset catalog."),
             ]
         )
     }
@@ -121,8 +135,10 @@ public struct ColorDirective: MarkdownDirective {
     }
 
     public func style(arguments: DirectiveArguments, context: DirectiveContext) -> DirectiveStyle {
-        guard let name = arguments.positional.first?.asString,
-              let color = NSColor(named: name) else { return .inherit }
+        guard let name = arguments.positional.first?.asString else { return .inherit }
+        // An unresolvable name leaves the body alone rather than guessing —
+        // the source stays readable and the mistake is visible.
+        guard let color = Self.named[name.lowercased()] ?? NSColor(named: name) else { return .inherit }
         return DirectiveStyle(attributes: [.foregroundColor: color])
     }
 

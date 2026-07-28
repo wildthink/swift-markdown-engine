@@ -2,18 +2,19 @@
 //  DirectiveStylingTests.swift
 //  MarkdownEngineTests
 //
-//  Phase 1 styling behaviour for directives. The styler has no directive case
-//  yet — directives ride the extension-node path — so what this suite locks in
-//  is that the generic machinery already does the right thing:
+//  STRUCTURAL styling behaviour for directives — what must hold regardless of
+//  what any given directive does with its body:
 //
-//    * a container's syntax shrinks when the caret leaves, and its body
-//      survives as ordinary styled markdown;
+//    * a container's syntax shrinks when the caret leaves and reveals when it
+//      enters, and the shrink never bleeds into the body;
 //    * a self-contained call renders as plain literal text (no glyph until
 //      Phase 3, and crucially nothing that collapses it to nothing);
-//    * an unknown directive id can't crash or restyle a neighbour.
+//    * an unknown or unregistered directive id can't crash or restyle a
+//      neighbour;
+//    * a scoped restyle matches the full pass.
 //
-//  Phase 2 replaces the "body has no directive attributes" expectations with
-//  real font composition; these tests are the before-picture.
+//  Font semantics — sizes, traits, composition — belong to
+//  `DirectiveCompositionTests`.
 //
 
 import AppKit
@@ -71,13 +72,15 @@ struct DirectiveStylingTests {
         #expect(font(in: attrs, at: 2)?.pointSize == hiddenSize)
     }
 
-    @Test("the body keeps the document font, not the shrunk marker font")
-    func bodyKeepsBodyFont() {
+    @Test("the body never picks up the shrunk marker font")
+    func bodyIsNotShrunk() {
+        // The body's SIZE is the directive's business (see
+        // `DirectiveCompositionTests`); what must hold structurally is that the
+        // shrink applied to the syntax never bleeds into the body.
         let text = "@font(size: 18){hello} tail"
         let attrs = style(text)
         let bodyStart = (text as NSString).range(of: "hello").location
-        let bodyFont = font(in: attrs, at: bodyStart)
-        #expect(bodyFont == nil || bodyFont?.pointSize == base)
+        #expect(font(in: attrs, at: bodyStart)?.pointSize != hiddenSize)
     }
 
     @Test("the caret inside the call reveals its syntax")
