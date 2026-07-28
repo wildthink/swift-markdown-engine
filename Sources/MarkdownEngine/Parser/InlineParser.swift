@@ -286,6 +286,16 @@ enum InlineParser {
 
     private static func matchClaimedSpan(_ ns: NSString, _ len: Int, at i: Int, registry: ExtensionRegistry) -> Span? {
         if let span = matchBuiltIn(ns, len, at: i) { return span }
+        // Directives (`@font(size: 18){…}`) match after every built-in, on the
+        // same terms as extension spans: registered names only, and a rejection
+        // leaves the candidate literal. They project into the AST as
+        // extension-shaped nodes under a reserved id namespace, so marker
+        // shrink, caret reveal, token projection, and rich copy all apply
+        // unchanged.
+        if let match = DirectiveScanner.match(ns, len: len, at: i, registry: registry.directives) {
+            return .ext(id: match.nodeID, range: match.range, contentRange: match.contentRange,
+                        markers: match.markers, parsesContent: match.parsesContent)
+        }
         // Extensions match after every built-in, in registration order. A
         // built-in trigger that matched-and-FAILED (e.g. `$50$` rejected by
         // the math heuristic) falls through here, so an extension sharing a
