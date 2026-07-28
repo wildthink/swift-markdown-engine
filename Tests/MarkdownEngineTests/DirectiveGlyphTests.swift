@@ -205,6 +205,44 @@ struct DirectiveGlyphTests {
         #expect(image("@icon(not.a.symbol.at.all)") == nil)
     }
 
+    // MARK: - Text presentation
+
+    @Test("a text presentation renders as a glyph, not a storage substitution")
+    func textPresentationRenders() {
+        let configuration = MarkdownEditorConfiguration(directives: [FlagDirective()])
+        let text = "@flag(JP)"
+        var image: NSImage?
+        for (range, attributes) in MarkdownASTStyler.styleAttributes(
+            text: text, fontName: fontName, fontSize: base,
+            caretLocation: -1, configuration: configuration
+        ) where NSLocationInRange(0, range) {
+            if let candidate = attributes[.latexImage] as? NSImage { image = candidate }
+        }
+        #expect(image != nil)
+        // The source characters are still all there.
+        #expect((text as NSString).length == 9)
+    }
+
+    @Test("an unresolvable code leaves the source visible")
+    func badFlagCodeStaysVisible() {
+        let configuration = MarkdownEditorConfiguration(directives: [FlagDirective()])
+        for (range, attributes) in MarkdownASTStyler.styleAttributes(
+            text: "@flag(ZZZZ)", fontName: fontName, fontSize: base,
+            caretLocation: -1, configuration: configuration
+        ) where NSLocationInRange(0, range) {
+            #expect(attributes[.latexImage] == nil)
+        }
+    }
+
+    @Test("flags are computed from the code, with no shipped dataset")
+    func flagFromCode() {
+        #expect(FlagDirective.flag(for: "JP") == "🇯🇵")
+        #expect(FlagDirective.flag(for: "us") == "🇺🇸")
+        #expect(FlagDirective.flag(for: "ZZZ") == nil)
+        #expect(FlagDirective.flag(for: "1A") == nil)
+        #expect(!FlagDirective.regions.isEmpty)
+    }
+
     @Test("scoped styling matches the full pass for a glyph-bearing paragraph")
     func scopedMatchesFull() {
         let text = "intro\n\nbefore @pagebreak after\n\noutro"

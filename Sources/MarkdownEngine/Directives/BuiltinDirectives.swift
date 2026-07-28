@@ -203,9 +203,151 @@ public struct IconDirective: MarkdownDirective {
         return .symbol(name: name, tint: arguments.string("color").flatMap(DirectivePalette.color))
     }
 
+    /// A curated shortlist, not the full SF Symbols catalogue — the system
+    /// ships thousands and exposes no enumeration API. Embedders wanting a
+    /// full picker subclass the idea: implement `valueCompletions` against
+    /// their own symbol list.
+    private static let suggestedSymbols = [
+        "star.fill", "star", "heart.fill", "bolt.fill", "flame.fill",
+        "checkmark.circle.fill", "xmark.circle.fill", "exclamationmark.triangle.fill",
+        "info.circle.fill", "questionmark.circle.fill", "bell.fill", "bookmark.fill",
+        "tag.fill", "pin.fill", "paperclip", "link", "calendar", "clock.fill",
+        "person.fill", "envelope.fill", "phone.fill", "house.fill", "gearshape.fill",
+        "magnifyingglass", "trash.fill", "folder.fill", "doc.fill", "book.fill",
+        "lightbulb.fill", "hammer.fill", "wrench.fill", "leaf.fill", "globe",
+        "arrow.right", "arrow.up.right", "arrow.down.to.line", "chevron.right",
+        "hand.thumbsup.fill", "hand.raised.fill", "eye.fill", "lock.fill",
+    ]
+
+    public func valueCompletions(for parameter: DirectiveParameter, prefix: String) -> [DirectiveCompletionItem] {
+        // Only the symbol name has an enumerable domain; `color:` falls through
+        // to the palette below.
+        guard parameter.label == nil else {
+            let needle = prefix.lowercased()
+            return DirectivePalette.named.keys.sorted()
+                .filter { needle.isEmpty || $0.hasPrefix(needle) }
+                .map { DirectiveCompletionItem(title: $0, subtitle: "Colour", insertion: $0) }
+        }
+        let needle = prefix.lowercased()
+        return Self.suggestedSymbols
+            .filter { needle.isEmpty || $0.hasPrefix(needle) }
+            .map { DirectiveCompletionItem(title: $0, subtitle: "SF Symbol",
+                                           insertion: $0, symbolName: $0) }
+    }
+
     public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
         let name = arguments.positional.first?.asString ?? ""
         return "<span class=\"icon\" data-symbol=\"\(name)\"></span>"
+    }
+}
+
+// MARK: - @flag(JP) — self-contained, VALUE completion
+
+/// A country flag from an ISO region code.
+///
+/// The reference case for argument-value completion: its domain is far too
+/// large to declare as a closed `.keyword` set, so it implements
+/// ``MarkdownDirective/valueCompletions(for:prefix:)`` and matches on both the
+/// code and the localised country name — type `@flag(jap` and get `JP`.
+///
+/// Deliberately dataset-free: codes come from `Locale.Region.isoRegions`,
+/// names from the user's own locale, and the flag itself is computed from the
+/// code's regional-indicator scalars. Nothing to ship, nothing to keep current.
+public struct FlagDirective: MarkdownDirective {
+
+    public static let identifier = "flag"
+
+    public init() {}
+
+    public var id: String { Self.identifier }
+
+    public var syntax: DirectiveSyntax {
+        DirectiveSyntax(
+            name: Self.identifier,
+            form: .selfContained,
+            parameters: [
+                .init(label: nil, kind: .keyword([]), isRequired: true,
+                      documentation: "ISO 3166 country code, e.g. JP."),
+            ]
+        )
+    }
+
+    public var completion: DirectiveCompletion {
+        DirectiveCompletion(
+            id: id,
+            title: "flag",
+            subtitle: "Country flag from an ISO code",
+            keywords: ["country", "nation"],
+            snippet: "@flag(|)",
+            symbolName: "flag"
+        )
+    }
+
+    public func presentation(arguments: DirectiveArguments, context: DirectiveContext) -> DirectivePresentation {
+        guard !context.isActive,
+              let code = arguments.positional.first?.asString,
+              let flag = Self.flag(for: code) else { return .literal }
+        return .text(flag)
+    }
+
+    public func valueCompletions(for parameter: DirectiveParameter, prefix: String) -> [DirectiveCompletionItem] {
+        let needle = prefix.lowercased()
+        return Self.regions
+            .filter { region in
+                needle.isEmpty
+                    || region.code.lowercased().hasPrefix(needle)
+                    || region.name.lowercased().hasPrefix(needle)
+            }
+            // Code matches first (typing `us` wants US, not "Uruguay"), then
+            // alphabetically by name.
+            .sorted { a, b in
+                let aCode = a.code.lowercased().hasPrefix(needle)
+                let bCode = b.code.lowercased().hasPrefix(needle)
+                if aCode != bCode { return aCode }
+                return a.name < b.name
+            }
+            .prefix(50)   // the picker is a list, not a gazetteer
+            .map { DirectiveCompletionItem(title: $0.code, subtitle: $0.name,
+                                           detail: $0.flag, insertion: $0.code) }
+    }
+
+    public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
+        guard let code = arguments.positional.first?.asString,
+              let flag = Self.flag(for: code) else { return "" }
+        return flag
+    }
+
+    // MARK: Regions
+
+    struct Region {
+        let code: String
+        let name: String
+        let flag: String
+    }
+
+    /// Two-letter regions that have a flag, named in the user's locale.
+    /// Built once — `isoRegions` is a few hundred entries and the localised
+    /// lookups are the expensive part.
+    static let regions: [Region] = {
+        Locale.Region.isoRegions.compactMap { region in
+            let code = region.identifier
+            guard code.count == 2, let flag = flag(for: code) else { return nil }
+            let name = Locale.current.localizedString(forRegionCode: code) ?? code
+            return Region(code: code, name: name, flag: flag)
+        }
+    }()
+
+    /// Regional-indicator scalars: `JP` → 🇯🇵.
+    static func flag(for code: String) -> String? {
+        let upper = code.uppercased()
+        guard upper.count == 2 else { return nil }
+        var scalars = String.UnicodeScalarView()
+        for scalar in upper.unicodeScalars {
+            guard scalar.value >= 0x41, scalar.value <= 0x5A,
+                  let indicator = UnicodeScalar(0x1F1E6 + scalar.value - 0x41) else { return nil }
+            scalars.append(indicator)
+        }
+        return String(scalars)
     }
 }
 
