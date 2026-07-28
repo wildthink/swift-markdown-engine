@@ -7,6 +7,7 @@ Sources/
 ├── MarkdownEngine/                          # core target — zero deps
 │   ├── Configuration/                       # MarkdownEditorConfiguration + MarkdownEditorTheme
 │   ├── Extensions/                          # the extension seam: MarkdownExtension + bundled opt-ins
+│   ├── Directives/                          # the directive seam: @font(size: 18){…} + bundled opt-ins
 │   ├── Services/                            # 4 protocols, no-op defaults, WikiLinkService
 │   ├── Parser/                              # two-phase AST: BlockParser → InlineParser → DocumentAST (+ token projection)
 │   ├── Styling/                             # MarkdownASTStyler (AST walk) + MarkdownStyler facade for NSImage passes
@@ -84,6 +85,46 @@ registered set can change at runtime.
 
 **Invariant:** built-in constructs always classify first; an extension can
 never take text away from core markdown.
+
+## [`Directives/`](Sources/MarkdownEngine/Directives): named inline commands
+
+`MarkdownDirective` is the extension seam's sibling for constructs that need a
+NAME and TYPED ARGUMENTS rather than delimiters — `@pagebreak`,
+`@font(size: 18){text}`. Registered via `MarkdownEditorConfiguration.directives`;
+the marker defaults to `@` and is configurable per registry and per directive,
+so `\`-flavored commands can coexist.
+
+Two forms, both **tree-shaped** — a directive's effect never escapes its own
+node:
+
+- **self-contained** — `@pagebreak`. A leaf.
+- **container** — `@font(size: 18){text}`. The body is re-parsed as markdown and
+  styled with the directive's font transform composed over the inherited font,
+  so `@font(size: 18){**bold**}` is bold *and* 18pt.
+
+There is deliberately no "applies to everything after me" form. That would make
+styling depend on document position rather than tree position, breaking both the
+styler's compose-on-descent model and the block-scoped incremental restyle (a
+directive's effect would outlive its own block).
+
+`DirectiveScanner` runs from `InlineParser.matchClaimedSpan` after every
+built-in, and directives project into the AST as **extension-shaped nodes**
+(`InlineNode.ext`) under the reserved `directive.` id namespace — so marker
+shrink, caret reveal, token projection, incremental restyle, and rich copy all
+apply unchanged, with no new node kind. `DirectiveRegistry` is carried by
+`ExtensionRegistry`, so the directive fingerprint folds into the one grammar
+fingerprint every parse cache already keys on.
+
+**Invariant:** registered names only. `@home` in prose stays literal text unless
+`home` is registered — the property that makes the seam safe to enable over an
+existing corpus.
+
+**Invariant:** a directive opens only at a boundary (start-of-line, whitespace,
+or opening punctuation), so `name@example.com` never opens one.
+
+**Invariant:** every rejection — unregistered name, malformed call, wrong form,
+unbalanced or multi-line run — leaves the candidate literal. Nothing here can
+produce a partial construct.
 
 ## [`Services/`](Sources/MarkdownEngine/Services): how does the engine talk to your app?
 
