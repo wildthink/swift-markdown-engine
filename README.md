@@ -149,13 +149,18 @@ rather than delimiters:
 
 ```swift
 var config = MarkdownEditorConfiguration()
-config.directives = [FontDirective(), ColorDirective(), IconDirective(), PageBreakDirective()]
+config.directives = [FontDirective(), ColorDirective()]
 ```
 
 ```markdown
-@font(size: 18){eighteen point}, @font(size: 1.5em){half again},
-@color(red){tinted}, and @icon(star.fill, color: yellow)
+@font(size: 18){eighteen point}, @font(size: 1.5em){half again}, @color(red){tinted}
 ```
+
+The engine ships `FontDirective` and `ColorDirective` as reference
+implementations — both pure presentation, both off by default, the same way
+`HighlightExtension` ships. Directives carrying curated data or document
+policy belong to your app; `Demo/` has `@icon`, `@flag`, `@emoji`, and
+`@pagebreak` as worked examples, 30–60 lines each.
 
 Two forms: **container** (`@font(size: 18){text}`) transforms its body;
 **self-contained** (`@icon(star.fill)`) draws a glyph in place of its own
@@ -192,8 +197,8 @@ NativeTextViewWrapper(
 Value candidates come from `MarkdownDirective.valueCompletions(for:prefix:)`,
 whose default already answers anything the schema declares (closed keyword
 sets, booleans). Implement it only when the domain is dynamic or too large to
-declare — `FlagDirective` offers every ISO region that way, matching on code or
-localised country name, with no shipped dataset.
+declare. The demo's `@flag` offers every ISO region that way, matching on code
+or localised country name, with no shipped dataset.
 
 ### Code Blocks
 
