@@ -39,7 +39,7 @@ struct DirectiveParserTests {
 
     private var registry: ExtensionRegistry {
         ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [
-            FontDirective(), ColorDirective(), PageBreakDirective(),
+            FontDirective(), ColorDirective(), MarkerDirective(),
             WildthinkDirective(), OpaqueDirective(), EitherDirective(),
         ]))
     }
@@ -86,7 +86,7 @@ struct DirectiveParserTests {
 
     @Test("a registered self-contained directive parses")
     func selfContainedParses() {
-        #expect(ids("text @pagebreak more") == ["pagebreak"])
+        #expect(ids("text @marker more") == ["marker"])
     }
 
     @Test("without a registered directive, @name stays literal")
@@ -106,14 +106,14 @@ struct DirectiveParserTests {
 
     @Test("a self-contained call carries no markers in Phase 1 — it renders literally")
     func selfContainedHasNoMarkers() {
-        #expect(directives("@pagebreak")[0].markers.isEmpty)
+        #expect(directives("@marker")[0].markers.isEmpty)
     }
 
     // MARK: - Boundary rule
 
     @Test("a directive must open at a boundary, not mid-word")
     func rejectsMidWord() {
-        #expect(ids("a@pagebreak").isEmpty)
+        #expect(ids("a@marker").isEmpty)
         #expect(ids("word@font(size: 18){x}").isEmpty)
     }
 
@@ -125,14 +125,14 @@ struct DirectiveParserTests {
 
     @Test("a marker run stays literal")
     func rejectsMarkerRun() {
-        #expect(ids("@@pagebreak").isEmpty)
+        #expect(ids("@@marker").isEmpty)
     }
 
     @Test("punctuation and line starts are valid boundaries")
     func acceptsBoundaries() {
-        #expect(ids("(@pagebreak)") == ["pagebreak"])
-        #expect(ids("line one\n@pagebreak") == ["pagebreak"])
-        #expect(ids("> @pagebreak") == ["pagebreak"])
+        #expect(ids("(@marker)") == ["marker"])
+        #expect(ids("line one\n@marker") == ["marker"])
+        #expect(ids("> @marker") == ["marker"])
     }
 
     @Test("markup delimiters are boundaries — a directive can abut emphasis")
@@ -143,19 +143,19 @@ struct DirectiveParserTests {
         #expect(ids("*@font(size: 18){x}*") == ["font"])
         #expect(ids("**@font(size: 18){x}**") == ["font"])
         #expect(ids("_@font(size: 18){x}_") == ["font"])
-        #expect(ids("- @pagebreak") == ["pagebreak"])
-        #expect(ids("1. @pagebreak") == ["pagebreak"])
-        #expect(ids("#@pagebreak") == ["pagebreak"])
+        #expect(ids("- @marker") == ["marker"])
+        #expect(ids("1. @marker") == ["marker"])
+        #expect(ids("#@marker") == ["marker"])
     }
 
     @Test("a digit is a word character, so it rejects")
     func rejectsAfterDigit() {
-        #expect(ids("v2@pagebreak").isEmpty)
+        #expect(ids("v2@marker").isEmpty)
     }
 
     @Test("an escaped marker stays literal")
     func rejectsEscapedMarker() {
-        #expect(ids("\\@pagebreak").isEmpty)
+        #expect(ids("\\@marker").isEmpty)
     }
 
     // MARK: - Form enforcement
@@ -167,7 +167,7 @@ struct DirectiveParserTests {
 
     @Test("a self-contained call with a body stays literal")
     func selfContainedRejectsBody() {
-        #expect(ids("@pagebreak{x}").isEmpty)
+        #expect(ids("@marker{x}").isEmpty)
     }
 
     @Test("an either-form directive accepts both shapes")
@@ -272,6 +272,21 @@ struct DirectiveParserTests {
         #expect(ids("\\bigger{x}", registry) == ["bigger"])
         // The default marker is inert for a directive that overrode it.
         #expect(ids("@bigger{x}", registry).isEmpty)
+    }
+
+    @Test("a multi-scalar marker is rejected at registration, not half-matched")
+    func rejectsMultiScalarMarker() {
+        // Marker dispatch is one dictionary probe per character on the parse
+        // hot path, which requires a single UTF-16 code unit. An emoji marker
+        // must drop out at registration rather than matching a lone surrogate.
+        struct EmojiMarkerDirective: MarkdownDirective {
+            var syntax: DirectiveSyntax {
+                DirectiveSyntax(name: "rocket", form: .selfContained, marker: "🚀")
+            }
+        }
+        let registry = DirectiveRegistry(directives: [EmojiMarkerDirective()])
+        #expect(registry.isEmpty)
+        #expect(ids("🚀rocket", ExtensionRegistry(extensions: [], directives: registry)).isEmpty)
     }
 
     @Test("markers coexist")

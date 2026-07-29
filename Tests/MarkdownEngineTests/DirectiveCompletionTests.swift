@@ -5,7 +5,7 @@
 //  Phase 4 — what the caret is trying to complete.
 //
 //  The scanner's job is the opposite of the parser's: it must succeed on text
-//  the parser REJECTS, because `@ico` and `@icon(sta` are what a directive
+//  the parser REJECTS, because `@gly` and `@glyph(sta` are what a directive
 //  looks like while you're still typing it. So these tests are mostly about
 //  incomplete input, plus the places a picker must stay shut.
 //
@@ -19,7 +19,7 @@ import Testing
 struct DirectiveCompletionTests {
 
     private let directives: [any MarkdownDirective] = [
-        FontDirective(), ColorDirective(), IconDirective(), FlagDirective(), PageBreakDirective(),
+        FontDirective(), ColorDirective(), GlyphDirective(), RegionDirective(), MarkerDirective(),
     ]
 
     private var registry: DirectiveRegistry { DirectiveRegistry(directives: directives) }
@@ -44,14 +44,14 @@ struct DirectiveCompletionTests {
     func bareMarkerOffersAll() {
         let candidates = titles("@|")
         #expect(candidates.contains("font"))
-        #expect(candidates.contains("icon"))
-        #expect(candidates.contains("flag"))
+        #expect(candidates.contains("glyph"))
+        #expect(candidates.contains("region"))
     }
 
     @Test("a partial name filters")
     func partialNameFilters() {
-        #expect(titles("@fl|") == ["flag"])
-        #expect(titles("@ico|") == ["icon"])
+        #expect(titles("@reg|") == ["region"])
+        #expect(titles("@gly|") == ["glyph"])
     }
 
     @Test("a name match outranks a keyword-only match")
@@ -65,8 +65,8 @@ struct DirectiveCompletionTests {
 
     @Test("keywords match too, and rank below name matches")
     func keywordsMatch() {
-        // `country` is a keyword of `flag`, not a directive name.
-        #expect(titles("@country|") == ["flag"])
+        // `country` is a keyword of `region`, not a directive name.
+        #expect(titles("@country|") == ["region"])
     }
 
     @Test("the name context replaces from the marker to the caret")
@@ -96,20 +96,20 @@ struct DirectiveCompletionTests {
 
     @Test("a positional argument offers the directive's values")
     func positionalValues() {
-        let candidates = titles("@icon(sta|")
+        let candidates = titles("@glyph(sta|")
         #expect(candidates.contains("star.fill"))
         #expect(candidates.allSatisfy { $0.hasPrefix("sta") })
     }
 
     @Test("an empty argument offers the unfiltered list")
     func emptyArgumentOffersAll() {
-        #expect(!titles("@icon(|").isEmpty)
+        #expect(!titles("@glyph(|").isEmpty)
     }
 
     @Test("a labelled argument resolves to its own parameter")
     func labelledArgument() {
-        let found = context("@icon(star.fill, color: gr|")
-        #expect(found?.candidates.map(\.title) == ["gray", "green", "grey"])
+        let found = context("@glyph(star.fill, color: gr|")
+        #expect(found?.candidates.map(\.title) == ["green"])
         if case .argument(let label, let index) = found?.kind {
             #expect(label == "color")
             #expect(index == 1)
@@ -120,13 +120,13 @@ struct DirectiveCompletionTests {
 
     @Test("the value context replaces just the typed value")
     func valueReplacementRange() {
-        let text = "@icon(star.fill, color: gr"
+        let text = "@glyph(star.fill, color: gr"
         let found = DirectiveCompletionScanner.context(
             in: text as NSString, caret: (text as NSString).length,
             registry: registry, directives: directives, settings: .default
         )
         // "gr" only — not the label, not the preceding argument.
-        #expect(found?.replacementRange == NSRange(location: 24, length: 2))
+        #expect(found?.replacementRange == NSRange(location: 25, length: 2))
         #expect(found?.prefix == "gr")
     }
 
@@ -137,15 +137,15 @@ struct DirectiveCompletionTests {
         #expect(titles("@font(weight: b|") == ["bold"])
     }
 
-    @Test("flags match on code and on localised name")
+    @Test("a dynamic domain matches on more than one field")
     func flagMatchesCodeAndName() {
-        #expect(titles("@flag(JP|").contains("JP"))
-        #expect(titles("@flag(jap|").contains("JP"))
+        #expect(titles("@region(JP|").contains("JP"))
+        #expect(titles("@region(jap|").contains("JP"))
     }
 
-    @Test("a flag candidate previews the flag it will produce")
+    @Test("a candidate previews the result it will produce")
     func flagCandidatePreviews() {
-        let item = context("@flag(JP|")?.candidates.first { $0.title == "JP" }
+        let item = context("@region(JP|")?.candidates.first { $0.title == "JP" }
         #expect(item?.detail == "🇯🇵")
         #expect(item?.insertion == "JP")
     }
@@ -165,8 +165,8 @@ struct DirectiveCompletionTests {
 
     @Test("a closed call offers nothing")
     func closedCallOffersNothing() {
-        #expect(context("@icon(star.fill)| ") == nil)
-        #expect(context("@icon(star.fill) and then|") == nil)
+        #expect(context("@glyph(star.fill)| ") == nil)
+        #expect(context("@glyph(star.fill) and then|") == nil)
     }
 
     @Test("the caret inside a container body is not completing arguments")
@@ -205,9 +205,9 @@ struct DirectiveCompletionTests {
 
     @Test("markup delimiters before the marker still open a picker")
     func markupBoundaryOpensPicker() {
-        #expect(titles("*@fl|") == ["flag"])
-        #expect(titles("- @fl|") == ["flag"])
-        #expect(titles("**@fl|") == ["flag"])
+        #expect(titles("*@reg|") == ["region"])
+        #expect(titles("- @reg|") == ["region"])
+        #expect(titles("**@reg|") == ["region"])
     }
 
     // MARK: - Commit requests

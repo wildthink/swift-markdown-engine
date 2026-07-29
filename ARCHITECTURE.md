@@ -100,7 +100,8 @@ so `\`-flavored commands can coexist.
 Two forms, both **tree-shaped** — a directive's effect never escapes its own
 node:
 
-- **self-contained** — `@pagebreak`, `@icon(star.fill, color: yellow)`. A leaf
+- **self-contained** — `@pagebreak`, `@icon(star.fill, color: yellow)` (both
+  embedder-side; the engine ships only `@font` and `@color`). A leaf
   that draws a glyph in place of its collapsed source, on the same mechanism
   inline LaTeX uses: the characters stay in the text, the first one carries the
   image and enough kern to occupy its width, the rest collapse. A glyph that

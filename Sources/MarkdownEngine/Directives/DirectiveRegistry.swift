@@ -25,8 +25,21 @@ import Foundation
 /// dispatches on the first character — so an embedder that wants
 /// LaTeX-flavoured authoring can register directives under `\` and keep `@`
 /// free for mentions, or drop `@` entirely.
+///
+/// - Important: `@` is also the conventional trigger for @-mentions. An app
+///   that already uses `@` for people or documents should give directives a
+///   different marker rather than disambiguating at the trigger: the two
+///   pickers would otherwise compete for the same keystroke. The
+///   registered-names-only rule limits the damage (`@alice` stays literal
+///   unless `alice` is a directive), but the completion picker still opens on
+///   the bare marker.
+///
+/// - Note: A marker must be a single UTF-16 code unit. Emoji and other
+///   multi-scalar characters are rejected at registration so marker dispatch
+///   stays one dictionary probe per character on the parse hot path.
 public struct DirectiveRegistrySettings: Sendable, Equatable {
-    /// Marker used by directives that don't override it.
+    /// Marker used by directives that don't override it. Must be a single
+    /// UTF-16 code unit; see the type's note.
     public var defaultMarker: Character
 
     public static let `default` = DirectiveRegistrySettings()

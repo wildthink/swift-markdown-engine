@@ -36,7 +36,7 @@ struct DirectiveCompositionTests {
 
     private var configuration: MarkdownEditorConfiguration {
         MarkdownEditorConfiguration(directives: [
-            FontDirective(), ColorDirective(), PageBreakDirective(), ScaleDirective(),
+            FontDirective(), ColorDirective(), MarkerDirective(), ScaleDirective(),
         ])
     }
 

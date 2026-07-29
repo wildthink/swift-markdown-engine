@@ -261,12 +261,13 @@ struct ContentView: View {
         // for constructs that need a name and parameters rather than
         // delimiters. The marker defaults to `@` and is configurable via
         // `config.directiveSettings`.
-        // `EmojiDirective` is defined at the bottom of THIS file, not in the
-        // engine — the point being that a third-party directive with its own
-        // argument-value completions is about forty lines.
+        // Only `Font` and `Color` come from the engine — both are pure
+        // presentation. `Icon`, `Flag`, `Emoji`, and `PageBreak` live in this
+        // demo's own `DemoDirectives.swift`, because curated data and print
+        // semantics are app concerns, not engine primitives.
         config.directives = [
-            FontDirective(), ColorDirective(), IconDirective(),
-            FlagDirective(), EmojiDirective(), PageBreakDirective(),
+            FontDirective(), ColorDirective(),
+            IconDirective(), FlagDirective(), EmojiDirective(), PageBreakDirective(),
         ]
 
         // Toolbar-driven modes.
@@ -394,10 +395,10 @@ you get SF Symbols, and inside `@color(` the palette.
 
 Each directive declares its own parameters, so the picker knows what to offer \
 without the editor knowing anything about flags, emoji, or symbols. \
-`@flag` ships in the engine and carries no data at all — codes come from the \
-system, names from your locale, and the flag itself is computed from the code. \
-`@emoji` is defined in this demo's own source, in about forty lines, to show \
-what a third-party directive costs.
+Only `@font` and `@color` come from the engine. `@icon`, `@flag`, `@emoji`, \
+and `@pagebreak` are defined in this demo's own `DemoDirectives.swift` — \
+30–60 lines each, schema and completions included — because curated data and \
+print semantics belong to the app, not the editor.
 """
 
 /// Table layout demo: the first table's cells WRAP to the available width
@@ -528,65 +529,3 @@ private let markdownFooter = """
 
 """
 
-// MARK: - A directive defined by the embedder, not the engine
-
-/// `@emoji(tada)` — the whole point of this type is its size.
-///
-/// It declares one positional parameter, resolves it to a glyph, and answers
-/// completion queries for it. That's the entire contract: the engine handles
-/// parsing, marker collapse, caret reveal, incremental restyling, rich copy,
-/// and the picker's keyboard and ranking.
-///
-/// The lookup table here is deliberately short. A real embedder would back
-/// `valueCompletions` with a full emoji corpus and its own search — the engine
-/// offers whatever the directive returns, so the corpus never has to live in
-/// the engine or be kept current by it.
-struct EmojiDirective: MarkdownDirective {
-
-    private static let table: [(name: String, glyph: String)] = [
-        ("tada", "🎉"), ("rocket", "🚀"), ("sparkles", "✨"), ("fire", "🔥"),
-        ("bug", "🐛"), ("wrench", "🔧"), ("book", "📚"), ("bulb", "💡"),
-        ("warning", "⚠️"), ("check", "✅"), ("cross", "❌"), ("eyes", "👀"),
-        ("thinking", "🤔"), ("clap", "👏"), ("heart", "❤️"), ("star", "⭐️"),
-        ("coffee", "☕️"), ("ship", "🚢"), ("lock", "🔒"), ("chart", "📈"),
-    ]
-
-    var syntax: DirectiveSyntax {
-        DirectiveSyntax(
-            name: "emoji",
-            form: .selfContained,
-            parameters: [
-                .init(label: nil, kind: .keyword([]), isRequired: true,
-                      documentation: "Emoji name, e.g. tada."),
-            ]
-        )
-    }
-
-    var completion: DirectiveCompletion {
-        DirectiveCompletion(
-            id: id, title: "emoji", subtitle: "Insert an emoji by name",
-            keywords: ["smiley", "reaction"], snippet: "@emoji(|)", symbolName: "face.smiling"
-        )
-    }
-
-    func presentation(arguments: DirectiveArguments, context: DirectiveContext) -> DirectivePresentation {
-        guard !context.isActive,
-              let name = arguments.positional.first?.asString,
-              let glyph = Self.table.first(where: { $0.name == name })?.glyph
-        else { return .literal }
-        return .text(glyph)
-    }
-
-    func valueCompletions(for parameter: DirectiveParameter, prefix: String) -> [DirectiveCompletionItem] {
-        let needle = prefix.lowercased()
-        return Self.table
-            .filter { needle.isEmpty || $0.name.hasPrefix(needle) }
-            .map { DirectiveCompletionItem(title: $0.name, detail: $0.glyph, insertion: $0.name) }
-    }
-
-    func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
-        guard let name = arguments.positional.first?.asString,
-              let glyph = Self.table.first(where: { $0.name == name })?.glyph else { return "" }
-        return glyph
-    }
-}

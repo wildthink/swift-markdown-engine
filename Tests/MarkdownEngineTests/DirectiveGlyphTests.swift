@@ -51,7 +51,7 @@ struct DirectiveGlyphTests {
 
     private var configuration: MarkdownEditorConfiguration {
         MarkdownEditorConfiguration(directives: [
-            PageBreakDirective(), BrokenSymbolDirective(), PlainDirective(), SwatchDirective(),
+            MarkerDirective(), BrokenSymbolDirective(), PlainDirective(), SwatchDirective(),
         ])
     }
 
@@ -78,19 +78,19 @@ struct DirectiveGlyphTests {
 
     @Test("the glyph rides on the call's first character")
     func glyphOnFirstCharacter() {
-        let attributes = firstCharAttributes("a @pagebreak b", "@pagebreak")
+        let attributes = firstCharAttributes("a @marker b", "@marker")
         #expect(attributes[.latexImage] is NSImage)
         #expect(attributes[.latexBounds] is NSValue)
     }
 
     @Test("the glyph is sized to the inherited font")
     func glyphSizedToFont() {
-        let small = firstCharAttributes("@pagebreak", "@pagebreak")[.latexImage] as? NSImage
+        let small = firstCharAttributes("@marker", "@marker")[.latexImage] as? NSImage
         let attrs = MarkdownASTStyler.styleAttributes(
-            text: "# @pagebreak", fontName: fontName, fontSize: base,
+            text: "# @marker", fontName: fontName, fontSize: base,
             caretLocation: -1, configuration: configuration
         )
-        let position = ("# @pagebreak" as NSString).range(of: "@pagebreak").location
+        let position = ("# @marker" as NSString).range(of: "@marker").location
         var large: NSImage?
         for (range, a) in attrs where NSLocationInRange(position, range) {
             if let image = a[.latexImage] as? NSImage { large = image }
@@ -102,7 +102,7 @@ struct DirectiveGlyphTests {
 
     @Test("the first character carries kern for the glyph's width")
     func firstCharacterReservesWidth() {
-        let attributes = firstCharAttributes("@pagebreak", "@pagebreak")
+        let attributes = firstCharAttributes("@marker", "@marker")
         let image = attributes[.latexImage] as? NSImage
         let kern = attributes[.kern] as? CGFloat ?? 0
         // Kern must account for most of the image width (minus the shrunk
@@ -113,8 +113,8 @@ struct DirectiveGlyphTests {
 
     @Test("the remaining characters collapse")
     func remainderCollapses() {
-        let text = "@pagebreak"
-        let tail = (text as NSString).range(of: "pagebreak")
+        let text = "@marker"
+        let tail = (text as NSString).range(of: "marker")
         var sawCollapse = false
         for (range, attributes) in style(text) where NSIntersectionRange(range, tail).length > 0 {
             if (attributes[.font] as? NSFont)?.pointSize == hiddenSize,
@@ -141,7 +141,7 @@ struct DirectiveGlyphTests {
 
     @Test("the caret inside reveals the source and drops the glyph")
     func caretRevealsSource() {
-        let attributes = firstCharAttributes("@pagebreak", "@pagebreak", caret: 3)
+        let attributes = firstCharAttributes("@marker", "@marker", caret: 3)
         #expect(attributes[.latexImage] == nil)
         #expect((attributes[.font] as? NSFont)?.pointSize != hiddenSize)
     }
@@ -166,14 +166,14 @@ struct DirectiveGlyphTests {
 
     @Test("spell-check is suppressed over a directive call")
     func spellCheckSuppressed() {
-        #expect(firstCharAttributes("@pagebreak", "@pagebreak")[.spellingState] as? Int == 0)
+        #expect(firstCharAttributes("@marker", "@marker")[.spellingState] as? Int == 0)
     }
 
     // MARK: - Isolation
 
     @Test("a glyph does not disturb the surrounding text")
     func neighboursUnaffected() {
-        let text = "before @pagebreak after"
+        let text = "before @marker after"
         let position = (text as NSString).range(of: "after").location
         for (range, attributes) in style(text) where NSLocationInRange(position, range) {
             #expect(attributes[.latexImage] == nil)
@@ -181,13 +181,13 @@ struct DirectiveGlyphTests {
         }
     }
 
-    // MARK: - IconDirective
+    // MARK: - GlyphDirective
 
     @Test("an icon draws the symbol named in its positional argument")
     func iconDrawsNamedSymbol() {
-        let configuration = MarkdownEditorConfiguration(directives: [IconDirective()])
+        let configuration = MarkdownEditorConfiguration(directives: [GlyphDirective()])
         func image(_ text: String) -> NSImage? {
-            let position = (text as NSString).range(of: "@icon").location
+            let position = (text as NSString).range(of: "@glyph").location
             var found: NSImage?
             for (range, attributes) in MarkdownASTStyler.styleAttributes(
                 text: text, fontName: fontName, fontSize: base,
@@ -197,20 +197,20 @@ struct DirectiveGlyphTests {
             }
             return found
         }
-        #expect(image("@icon(star.fill)") != nil)
-        #expect(image("@icon(checkmark.circle.fill, color: green)") != nil)
+        #expect(image("@glyph(star.fill)") != nil)
+        #expect(image("@glyph(checkmark.circle.fill, color: green)") != nil)
         // A dotted symbol name survives argument splitting.
-        #expect(image("@icon(arrow.down.to.line)") != nil)
+        #expect(image("@glyph(arrow.down.to.line)") != nil)
         // An unknown symbol leaves the source visible.
-        #expect(image("@icon(not.a.symbol.at.all)") == nil)
+        #expect(image("@glyph(not.a.symbol.at.all)") == nil)
     }
 
     // MARK: - Text presentation
 
     @Test("a text presentation renders as a glyph, not a storage substitution")
     func textPresentationRenders() {
-        let configuration = MarkdownEditorConfiguration(directives: [FlagDirective()])
-        let text = "@flag(JP)"
+        let configuration = MarkdownEditorConfiguration(directives: [RegionDirective()])
+        let text = "@region(JP)"
         var image: NSImage?
         for (range, attributes) in MarkdownASTStyler.styleAttributes(
             text: text, fontName: fontName, fontSize: base,
@@ -220,34 +220,26 @@ struct DirectiveGlyphTests {
         }
         #expect(image != nil)
         // The source characters are still all there.
-        #expect((text as NSString).length == 9)
+        #expect((text as NSString).length == 11)
     }
 
-    @Test("an unresolvable code leaves the source visible")
+    @Test("an unresolvable argument leaves the source visible")
     func badFlagCodeStaysVisible() {
-        let configuration = MarkdownEditorConfiguration(directives: [FlagDirective()])
+        let configuration = MarkdownEditorConfiguration(directives: [RegionDirective()])
         for (range, attributes) in MarkdownASTStyler.styleAttributes(
-            text: "@flag(ZZZZ)", fontName: fontName, fontSize: base,
+            text: "@region(ZZZZ)", fontName: fontName, fontSize: base,
             caretLocation: -1, configuration: configuration
         ) where NSLocationInRange(0, range) {
             #expect(attributes[.latexImage] == nil)
         }
     }
 
-    @Test("flags are computed from the code, with no shipped dataset")
-    func flagFromCode() {
-        #expect(FlagDirective.flag(for: "JP") == "🇯🇵")
-        #expect(FlagDirective.flag(for: "us") == "🇺🇸")
-        #expect(FlagDirective.flag(for: "ZZZ") == nil)
-        #expect(FlagDirective.flag(for: "1A") == nil)
-        #expect(!FlagDirective.regions.isEmpty)
-    }
 
     @Test("scoped styling matches the full pass for a glyph-bearing paragraph")
     func scopedMatchesFull() {
-        let text = "intro\n\nbefore @pagebreak after\n\noutro"
+        let text = "intro\n\nbefore @marker after\n\noutro"
         let ns = text as NSString
-        let paragraph = ns.paragraphRange(for: ns.range(of: "@pagebreak"))
+        let paragraph = ns.paragraphRange(for: ns.range(of: "@marker"))
         func digest(_ scoped: [NSRange]?) -> String {
             MarkdownASTStyler.styleAttributes(
                 text: text, fontName: fontName, fontSize: base,
