@@ -1,11 +1,14 @@
 # Writing Markdown for this engine
 
-A reference for agents (and people) generating documents this editor will
-render. It covers the whole grammar: CommonMark-ish core, the bundled
-extensions, and the directive seam.
+The grammar this engine accepts, end to end: CommonMark-ish core, the bundled
+extensions, and the directive seam. Written to be usable by anything that
+produces or consumes these documents — an LLM agent drafting content, a
+converter, or an editor that maps this syntax onto its own block model.
 
-Every claim below was checked against the parser rather than written from the
-source, so the "stays literal" rows are as reliable as the "works" rows.
+It is a description of the parser, not a style guide. Every claim below was
+run through the parser rather than written from the source, so the "stays
+literal" rows are as trustworthy as the "works" rows — and for a tool that has
+to round-trip a document, the rejection rules are the important half.
 
 ## The one rule that explains most surprises
 
@@ -250,6 +253,19 @@ Each row was run through the parser to produce this table.
    directive you want.
 7. Keep directives on one line, and quote argument values containing spaces,
    commas, or colons.
+
+## If you're mapping this onto another model
+
+A converter or block editor wants the parser's own vocabulary, not this prose.
+The canonical lists are `BlockKind` (`Parser/BlockParser.swift`) and
+`InlineNode` (`Parser/InlineParser.swift`); `DocumentAST.parse` produces the
+tree, and every range is an absolute UTF-16 `NSRange` into the source.
+
+Two properties matter for round-tripping. **The block sequence tiles the
+document** — blocks are gap-free, so no source is unaccounted for. And
+**unrecognised syntax is `.text`, not an error node**, so a document always
+parses; a tool that needs to know whether its own syntax survived has to
+compare the tree, not check for failure.
 
 ## Status
 
