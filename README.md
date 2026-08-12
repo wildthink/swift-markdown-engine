@@ -364,6 +364,11 @@ a local path, so any engine edit rebuilds into the demo on the next run.
 
 ## Documentation
 
+[AUTHORING.md](AUTHORING.md) is the syntax reference for whoever writes the
+documents — the supported grammar end to end, including what stays literal and
+why. Written for LLM agents generating markdown, and useful to people for the
+same reason.
+
 Full API docs ship as DocC. In Xcode: **Product → Build Documentation**
 (`⇧⌃⌘D`); for local CLI preview see [CONTRIBUTING.md](CONTRIBUTING.md). Once
 hosted on Swift Package Index, docs will live at
