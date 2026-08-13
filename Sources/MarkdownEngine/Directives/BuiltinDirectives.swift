@@ -7,7 +7,7 @@
 //  default — the core engine parses pure markdown; embedders opt in the way
 //  they do for extensions:
 //
-//      configuration.directives = [FontDirective(), ColorDirective(), PageBreakDirective()]
+//      configuration.directives = [FontDirective(), ColorDirective()]
 //
 //  `style` and `presentation` are declared here but not yet consulted by the
 //  styler (Phase 2 / Phase 3). In Phase 1 a container directive's syntax
@@ -50,17 +50,6 @@ public struct FontDirective: MarkdownDirective {
                       defaultValue: .keyword("regular"),
                       documentation: "Font weight."),
             ]
-        )
-    }
-
-    public var completion: DirectiveCompletion {
-        DirectiveCompletion(
-            id: id,
-            title: "font",
-            subtitle: "Set size, family, or weight for a span",
-            keywords: ["size", "typeface", "typography"],
-            snippet: "@font(size: |){}",
-            symbolName: "textformat.size"
         )
     }
 
@@ -123,17 +112,6 @@ public struct ColorDirective: MarkdownDirective {
         )
     }
 
-    public var completion: DirectiveCompletion {
-        DirectiveCompletion(
-            id: id,
-            title: "color",
-            subtitle: "Tint a span",
-            keywords: ["colour", "tint", "foreground"],
-            snippet: "@color(|){}",
-            symbolName: "paintpalette"
-        )
-    }
-
     public func style(arguments: DirectiveArguments, context: DirectiveContext) -> DirectiveStyle {
         guard let name = arguments.positional.first?.asString else { return .inherit }
         // An unresolvable name leaves the body alone rather than guessing —
@@ -145,41 +123,5 @@ public struct ColorDirective: MarkdownDirective {
     public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
         guard let name = arguments.positional.first?.asString else { return bodyHTML }
         return "<span style=\"color:\(name)\">\(bodyHTML)</span>"
-    }
-}
-
-// MARK: - @pagebreak — self-contained
-
-public struct PageBreakDirective: MarkdownDirective {
-
-    public static let identifier = "pagebreak"
-
-    public init() {}
-
-    public var id: String { Self.identifier }
-
-    public var syntax: DirectiveSyntax {
-        DirectiveSyntax(name: Self.identifier, form: .selfContained)
-    }
-
-    public var completion: DirectiveCompletion {
-        DirectiveCompletion(
-            id: id,
-            title: "pagebreak",
-            subtitle: "Force a page break when printing",
-            keywords: ["page", "break", "print"],
-            snippet: "@pagebreak",
-            symbolName: "arrow.down.to.line"
-        )
-    }
-
-    public func presentation(arguments: DirectiveArguments, context: DirectiveContext) -> DirectivePresentation {
-        // While the caret is inside, the source stays visible — the engine
-        // handles that flip; the directive just declines the glyph.
-        context.isActive ? .literal : .symbol(name: "arrow.down.to.line", tint: context.theme.mutedText)
-    }
-
-    public func html(arguments: DirectiveArguments, bodyHTML: String) -> String {
-        "<hr class=\"pagebreak\" />"
     }
 }

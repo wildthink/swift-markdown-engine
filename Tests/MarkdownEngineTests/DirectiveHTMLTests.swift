@@ -16,7 +16,7 @@ import Testing
 struct DirectiveHTMLTests {
 
     private let directives: [any MarkdownDirective] = [
-        FontDirective(), ColorDirective(), PageBreakDirective(),
+        FontDirective(), ColorDirective(), MarkerDirective(),
     ]
 
     private func html(_ markdown: String) -> String {
@@ -36,7 +36,7 @@ struct DirectiveHTMLTests {
 
     @Test("a self-contained directive renders its own markup")
     func selfContainedRenders() {
-        #expect(html("@pagebreak").contains("<hr class=\"pagebreak\" />"))
+        #expect(html("@marker").contains("<hr class=\"marker\" />"))
     }
 
     @Test("a directive with no styling arguments still emits its body")

@@ -29,7 +29,7 @@ struct DirectiveStylingTests {
     private var fontName: String { NSFont.systemFont(ofSize: 14).fontName }
 
     private var configuration: MarkdownEditorConfiguration {
-        MarkdownEditorConfiguration(directives: [FontDirective(), PageBreakDirective()])
+        MarkdownEditorConfiguration(directives: [FontDirective(), MarkerDirective()])
     }
 
     private func style(_ text: String, caret: Int = -1) -> [StyledRange] {
@@ -102,11 +102,11 @@ struct DirectiveStylingTests {
 
     @Test("a self-contained call renders as literal text — nothing collapses it")
     func selfContainedStaysVisible() {
-        let text = "before @pagebreak after"
+        let text = "before @marker after"
         let attrs = style(text)
-        let location = (text as NSString).range(of: "@pagebreak").location
+        let location = (text as NSString).range(of: "@marker").location
         // No shrink font and no negative kern anywhere in the call.
-        for (range, a) in attrs where NSIntersectionRange(range, NSRange(location: location, length: 10)).length > 0 {
+        for (range, a) in attrs where NSIntersectionRange(range, NSRange(location: location, length: 7)).length > 0 {
             #expect((a[.font] as? NSFont)?.pointSize != hiddenSize)
             #expect((a[.kern] as? CGFloat ?? 0) >= 0)
         }
