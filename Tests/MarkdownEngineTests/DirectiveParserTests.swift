@@ -345,4 +345,39 @@ struct DirectiveParserTests {
         #expect(!registry.isEmpty)
         #expect(!registry.fingerprint.isEmpty)
     }
+
+    // MARK: - Known limitation: pre-claimed spans in a body
+
+    /// A body holding a span claimed by an EARLIER pass rejects the whole
+    /// directive. Pinned deliberately: this is the documented limitation, and
+    /// the follow-up that lifts it should flip these, not delete them.
+    @Test("a code span in the body keeps the whole directive literal")
+    func codeSpanInBodyRejects() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        let nodes = InlineParser.parse("@font(size: 18){a `b` c}", registry: registry)
+        #expect(!nodes.contains { if case .ext = $0 { return true }; return false })
+    }
+
+    @Test("a backslash escape in the body keeps the whole directive literal")
+    func escapeInBodyRejects() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        let nodes = InlineParser.parse(#"@font(size: 18){a \* c}"#, registry: registry)
+        #expect(!nodes.contains { if case .ext = $0 { return true }; return false })
+    }
+
+    /// The limitation is specific to spans claimed BEFORE this pass. Anything
+    /// claimed in the same pass or later composes normally, so the rejection
+    /// rule is narrower than "no other construct in a body".
+    @Test("inline math, links and emphasis all compose inside a body")
+    func samePassConstructsInBodyCompose() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        for source in ["@font(size: 18){a $x^2$ c}",
+                       "@font(size: 18){a [l](u) c}",
+                       "@font(size: 18){a *b* c}"] {
+            let nodes = InlineParser.parse(source, registry: registry)
+            #expect(nodes.contains { if case .ext = $0 { return true }; return false },
+                    "expected a directive for \(source)")
+        }
+    }
+
 }

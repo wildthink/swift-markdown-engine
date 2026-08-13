@@ -48,3 +48,9 @@ struct MarkerDirective: MarkdownDirective {
     var syntax: DirectiveSyntax { DirectiveSyntax(name: "marker", form: .selfContained) }
     func html(arguments: DirectiveArguments, bodyHTML: String) -> String { "<hr class=\"marker\" />" }
 }
+
+/// Self-contained with two POSITIONAL parameters — the shape that exercises
+/// defaults on positionals, which labelled-only filling used to skip.
+struct SelfContainedPair: MarkdownDirective {
+    var syntax: DirectiveSyntax { DirectiveSyntax(name: "pair", form: .selfContained) }
+}

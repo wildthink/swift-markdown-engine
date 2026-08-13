@@ -286,12 +286,21 @@ enum InlineParser {
 
     private static func matchClaimedSpan(_ ns: NSString, _ len: Int, at i: Int, registry: ExtensionRegistry) -> Span? {
         if let span = matchBuiltIn(ns, len, at: i) { return span }
-        // Directives (`@font(size: 18){…}`) match after every built-in, on the
-        // same terms as extension spans: registered names only, and a rejection
-        // leaves the candidate literal. They project into the AST as
-        // extension-shaped nodes under a reserved id namespace, so marker
+        // Directives (`@font(size: 18){…}`) match after every built-in and
+        // BEFORE the extension loop below, on the same terms as extension
+        // spans: registered names only, and a rejection leaves the candidate
+        // literal. The ordering is deliberate — a directive is a named
+        // construct with a boundary rule, so it can't be ambiguous with an
+        // extension's delimiters unless an extension opens with the directive
+        // marker, in which case the directive wins. They project into the AST
+        // as extension-shaped nodes under a reserved id namespace, so marker
         // shrink, caret reveal, token projection, and rich copy all apply
         // unchanged.
+        //
+        // A directive candidate overlapping an ALREADY-CLAIMED span is
+        // rejected outright, so a code span or a backslash escape in the body
+        // keeps the whole directive literal — see the known limitation in
+        // `DirectiveScanner`.
         if let match = DirectiveScanner.match(ns, len: len, at: i, registry: registry.directives) {
             return .ext(id: match.nodeID, range: match.range, contentRange: match.contentRange,
                         markers: match.markers, parsesContent: match.parsesContent)
