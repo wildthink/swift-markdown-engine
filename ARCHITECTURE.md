@@ -7,7 +7,7 @@ Sources/
 ├── MarkdownEngine/                          # core target — zero deps
 │   ├── Configuration/                       # MarkdownEditorConfiguration + MarkdownEditorTheme
 │   ├── Extensions/                          # the extension seam: MarkdownExtension + bundled opt-ins
-│   ├── Directives/                          # the directive seam: @font(size: 18){…} + bundled opt-ins
+│   ├── Directives/                          # the directive seam: @font(size: 18){…} — parsing, glyphs, completion
 │   ├── Services/                            # 4 protocols, no-op defaults, WikiLinkService
 │   ├── Parser/                              # two-phase AST: BlockParser → InlineParser → DocumentAST (+ token projection)
 │   ├── Styling/                             # MarkdownASTStyler (AST walk) + MarkdownStyler facade for NSImage passes
@@ -94,27 +94,21 @@ never take text away from core markdown.
 `MarkdownDirective` is the extension seam's sibling for constructs that need a
 NAME and TYPED ARGUMENTS rather than delimiters — `@pagebreak`,
 `@font(size: 18){text}`. Registered via `MarkdownEditorConfiguration.directives`;
-the marker defaults to `@` and is configurable per registry and per directive,
-so `\`-flavored commands can coexist.
+the marker defaults to `@` and is configurable per registry and per directive.
 
 Two forms, both **tree-shaped** — a directive's effect never escapes its own
-node:
+node: **self-contained** (`@pagebreak`, a leaf that draws a glyph in place of
+its collapsed source) and **container** (`@font(size: 18){text}`, whose body is
+re-parsed as markdown). There is deliberately no "applies to everything after
+me" form: that would make styling depend on document position rather than tree
+position, breaking both the styler's compose-on-descent model and the
+block-scoped incremental restyle.
 
-- **self-contained** — `@pagebreak`, `@icon(star.fill, color: yellow)` (both
-  embedder-side; the engine ships only `@font` and `@color`). A leaf
-  that draws a glyph in place of its collapsed source, on the same mechanism
-  inline LaTeX uses: the characters stay in the text, the first one carries the
-  image and enough kern to occupy its width, the rest collapse. A glyph that
-  can't be produced (unknown SF Symbol, `.literal`) leaves the source visible
-  rather than collapsing it to a gap the user can't see or fix.
-- **container** — `@font(size: 18){text}`. The body is re-parsed as markdown and
-  styled with the directive's font transform composed over the inherited font,
-  so `@font(size: 18){**bold**}` is bold *and* 18pt.
-
-There is deliberately no "applies to everything after me" form. That would make
-styling depend on document position rather than tree position, breaking both the
-styler's compose-on-descent model and the block-scoped incremental restyle (a
-directive's effect would outlive its own block).
+The glyph rides the same mechanism inline LaTeX uses: the characters stay in
+the text, the first one carries the image and enough kern to occupy its width,
+the rest collapse to zero width. A glyph that can't be produced (an unknown SF
+Symbol, or `.literal`) leaves the source visible rather than collapsing it to a
+gap the user can't see or fix.
 
 Container styling lives in `MarkdownASTStyler+Directives.swift`: it resolves the
 directive, coerces its arguments against the declared schema, and returns the
@@ -124,19 +118,30 @@ the same prefix geometry, so rich copy and on-screen styling cannot disagree
 about what was passed.
 
 `DirectiveScanner` runs from `InlineParser.matchClaimedSpan` after every
-built-in, and directives project into the AST as **extension-shaped nodes**
-(`InlineNode.ext`) under the reserved `directive.` id namespace — so marker
-shrink, caret reveal, token projection, incremental restyle, and rich copy all
-apply unchanged, with no new node kind. `DirectiveRegistry` is carried by
-`ExtensionRegistry`, so the directive fingerprint folds into the one grammar
-fingerprint every parse cache already keys on.
+built-in, so a directive can never take text away from core markdown. Matches
+project into the AST as **extension-shaped nodes** (`InlineNode.ext`) under the
+reserved `directive.` id namespace, rather than as a new node kind — so
+`InlineNode`, `buildTree`, `offsetNodes`, `InlineASTAdapter`, `MarkdownToken`,
+and `shrinkInlineMarkers` are untouched, and directives inherit marker shrink,
+caret reveal, token projection, incremental restyle, and rich copy unchanged.
+
+`DirectiveRegistry` is carried BY `ExtensionRegistry`, so the directive
+fingerprint folds into the one grammar fingerprint every parse cache already
+keys on — registering a directive at runtime invalidates those caches with no
+second key threaded through the pipeline. A directive-free registry produces a
+byte-identical fingerprint to before the seam existed, so no existing document
+re-parses.
+
+Arguments are coerced against the declared schema at STYLING time, not parse
+time: the parser stays geometry-only, and a directive-free document pays
+nothing.
 
 **Invariant:** registered names only. `@home` in prose stays literal text unless
 `home` is registered — the property that makes the seam safe to enable over an
 existing corpus.
 
-**Invariant:** a directive opens only at a boundary (start-of-line, whitespace,
-or opening punctuation), so `name@example.com` never opens one.
+**Invariant:** a directive opens only after a non-word character, so
+`name@example.com` never opens one.
 
 **Invariant:** every rejection — unregistered name, malformed call, wrong form,
 unbalanced or multi-line run — leaves the candidate literal. Nothing here can

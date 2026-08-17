@@ -132,8 +132,14 @@ extension DirectiveArguments {
                                      diagnostics: diagnostics, schema: schema, anchor: range)
     }
 
-    /// Fill unsupplied labelled parameters from their defaults, then report
-    /// whatever required parameter is still missing.
+    /// Fill unsupplied parameters — labelled and positional alike — from their
+    /// defaults, then report whatever required parameter is still missing.
+    ///
+    /// Positional defaults fill by POSITION, so they only apply to a tail the
+    /// call didn't reach: given `(a, b = 2, c)`, `@x(1)` yields `1, 2` and
+    /// still reports `#2` missing. A default can't be skipped over, because
+    /// there is no syntax for "use the default here but supply the next one" —
+    /// so the first positional without a default ends the filling.
     private static func applyingDefaults(
         labeled: [String: DirectiveValue],
         positional: [DirectiveValue],
@@ -142,7 +148,9 @@ extension DirectiveArguments {
         anchor: NSRange
     ) -> DirectiveArguments {
         var labeled = labeled
+        var positional = positional
         var diagnostics = diagnostics
+
         for parameter in schema {
             guard let label = parameter.label, labeled[label] == nil else { continue }
             if let fallback = parameter.defaultValue {
@@ -151,10 +159,17 @@ extension DirectiveArguments {
                 diagnostics.append(.init(kind: .missingRequired(label), range: anchor))
             }
         }
-        let requiredPositional = schema.filter { $0.label == nil && $0.isRequired }.count
-        if positional.count < requiredPositional {
-            diagnostics.append(.init(kind: .missingRequired("#\(positional.count)"), range: anchor))
+
+        let positionalSchema = schema.filter { $0.label == nil }
+        for index in positional.count..<max(positional.count, positionalSchema.count) {
+            guard let fallback = positionalSchema[index].defaultValue else { break }
+            positional.append(fallback)
         }
+        for index in positional.count..<max(positional.count, positionalSchema.count)
+        where positionalSchema[index].isRequired {
+            diagnostics.append(.init(kind: .missingRequired("#\(index)"), range: anchor))
+        }
+
         return DirectiveArguments(labeled: labeled, positional: positional, diagnostics: diagnostics)
     }
 

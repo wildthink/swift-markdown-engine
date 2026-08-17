@@ -17,7 +17,19 @@
 //  line break. Nothing here can produce a partial construct.
 //
 //  Because the scanner runs inside `scanLinkFamily` (pass 3), a directive
-//  inside a code span or `$…$` is already claimed and never fires.
+//  inside a code span is already claimed and never fires.
+//
+//  KNOWN LIMITATION — a directive whose BODY holds a pre-claimed span is
+//  rejected whole, so `@font(size: 18){a `b` c}` produces no directive node
+//  at all rather than a directive containing a code span. The same applies to
+//  a backslash escape (`{a \* c}`), since escapes are claimed in pass 2.
+//
+//  It is exactly the pre-claimed passes that bite — code spans and escapes.
+//  Constructs claimed in this pass or later are fine: `$…$`, links, emphasis
+//  and nesting all work inside a body. The cause is `scanLinkFamily`'s
+//  overlap rule, which rejects any candidate meeting a claimed span; #118
+//  granted link labels an exemption from the same rule, and directives want
+//  the equivalent. Tracked separately — it belongs with that rule, not here.
 //
 
 import Foundation

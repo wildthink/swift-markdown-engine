@@ -4,16 +4,58 @@
 //
 //  Directives used across the directive suites.
 //
-//  The engine ships only `FontDirective` and `ColorDirective` as reference
-//  implementations — anything carrying curated data or app policy (icons,
-//  flags, print semantics) belongs to the embedder. So the shapes those would
-//  have exercised are defined here instead, which also keeps the tests
-//  hermetic: they test the SEAM, not the bundled directives.
+//  Deliberately test-local: the engine ships only `FontDirective` and
+//  `ColorDirective` as reference implementations — anything carrying curated
+//  data or app policy (icons, flags, print semantics) belongs to the embedder.
+//  So the shapes those would have exercised are declared here instead, which
+//  also keeps the suites hermetic: they test the SEAM, not the bundled
+//  directives. A schema is a schema whether it came from the engine or from an
+//  embedder.
 //
 
 import AppKit
 import Foundation
 @testable import MarkdownEngine
+
+// MARK: - Parsing and argument shapes
+
+/// Container form with a mixed labelled schema — the shape the parser has to
+/// carry through argument coercion.
+struct SizedDirective: MarkdownDirective {
+    var syntax: DirectiveSyntax {
+        DirectiveSyntax(
+            name: "font",
+            form: .container,
+            parameters: [
+                .init(label: "size", kind: .length,
+                      documentation: "Point size, or 1.5em / 120% relative to the surrounding text."),
+                .init(label: "family", kind: .string, documentation: "Font family name."),
+                .init(label: "weight", kind: .keyword(["regular", "bold"]),
+                      defaultValue: .keyword("regular"), documentation: "Font weight."),
+            ]
+        )
+    }
+}
+
+/// Container form with a required POSITIONAL argument.
+struct TintDirective: MarkdownDirective {
+    var syntax: DirectiveSyntax {
+        DirectiveSyntax(
+            name: "color",
+            form: .container,
+            parameters: [.init(label: nil, kind: .keyword([]), isRequired: true,
+                               documentation: "Colour name.")]
+        )
+    }
+}
+
+/// Self-contained with two POSITIONAL parameters — the shape that exercises
+/// defaults on positionals, which labelled-only filling used to skip.
+struct SelfContainedPair: MarkdownDirective {
+    var syntax: DirectiveSyntax { DirectiveSyntax(name: "pair", form: .selfContained) }
+}
+
+// MARK: - Presentation and completion shapes
 
 /// Self-contained, no arguments, draws a fixed symbol. The minimal glyph case.
 struct MarkerDirective: MarkdownDirective {

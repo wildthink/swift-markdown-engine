@@ -177,12 +177,69 @@ struct DirectiveArgumentTests {
     @Test("arguments read off a parsed directive node")
     func readsFromParsedNode() {
         let text = "@font(size: 1.5em, weight: bold){hi}" as NSString
-        let registry = DirectiveRegistry(directives: [FontDirective()])
+        let registry = DirectiveRegistry(directives: [SizedDirective()])
         let match = DirectiveScanner.match(text, len: text.length, at: 0, registry: registry)
         let args = DirectiveArguments(parsing: match?.argumentsRange, in: text,
-                                      schema: FontDirective().syntax.parameters)
+                                      schema: SizedDirective().syntax.parameters)
         #expect(args.length("size", relativeTo: 12) == 18)
         #expect(args.string("weight") == "bold")
         #expect(args.isValid)
     }
+
+    // MARK: - Defaults on positional parameters
+
+    /// A positional parameter carrying a default used to yield nothing:
+    /// `applyingDefaults` only filled labelled ones.
+    private func positionalString(_ args: DirectiveArguments, _ index: Int) -> String? {
+        index < args.positional.count ? args.positional[index].asString : nil
+    }
+
+    private var positionalSchema: [DirectiveParameter] {
+        [.init(label: nil, kind: .keyword([]), isRequired: true),
+         .init(label: nil, kind: .keyword([]), defaultValue: .keyword("medium"))]
+    }
+
+    private func arguments(_ source: String, schema: [DirectiveParameter]) -> DirectiveArguments {
+        let text = source as NSString
+        let registry = DirectiveRegistry(directives: [SelfContainedPair()])
+        let match = DirectiveScanner.match(text, len: text.length, at: 0, registry: registry)
+        return DirectiveArguments(parsing: match?.argumentsRange, in: text, schema: schema)
+    }
+
+    @Test("an unsupplied positional falls back to its default")
+    func positionalDefaultApplies() {
+        let args = arguments("@pair(star)", schema: positionalSchema)
+        #expect(positionalString(args, 0) == "star")
+        #expect(positionalString(args, 1) == "medium")
+        #expect(args.isValid)
+    }
+
+    @Test("a supplied positional wins over its default")
+    func positionalDefaultOverridden() {
+        let args = arguments("@pair(star, large)", schema: positionalSchema)
+        #expect(positionalString(args, 1) == "large")
+        #expect(args.isValid)
+    }
+
+    @Test("a required positional with no default is still reported missing")
+    func requiredPositionalStillMissing() {
+        let args = arguments("@pair", schema: positionalSchema)
+        #expect(!args.isValid)
+        #expect(args.diagnostics.contains { if case .missingRequired("#0") = $0.kind { return true }; return false })
+    }
+
+    /// Defaults fill a TAIL. There is no syntax for skipping one, so the first
+    /// positional without a default stops the fill and is reported instead.
+    @Test("a default cannot be skipped over to reach a later parameter")
+    func positionalDefaultsFillOnlyTheTail() {
+        let schema: [DirectiveParameter] = [
+            .init(label: nil, kind: .keyword([]), isRequired: true),
+            .init(label: nil, kind: .keyword([]), defaultValue: .keyword("mid")),
+            .init(label: nil, kind: .keyword([]), isRequired: true),
+        ]
+        let args = arguments("@pair(a)", schema: schema)
+        #expect(positionalString(args, 1) == "mid")
+        #expect(args.diagnostics.contains { if case .missingRequired("#2") = $0.kind { return true }; return false })
+    }
+
 }

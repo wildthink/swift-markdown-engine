@@ -39,7 +39,7 @@ struct DirectiveParserTests {
 
     private var registry: ExtensionRegistry {
         ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [
-            FontDirective(), ColorDirective(), MarkerDirective(),
+            SizedDirective(), TintDirective(), MarkerDirective(),
             WildthinkDirective(), OpaqueDirective(), EitherDirective(),
         ]))
     }
@@ -192,7 +192,7 @@ struct DirectiveParserTests {
     func scannerHonoursEscapedBrace() {
         let text = "@font(size: 18){a \\} b}" as NSString
         let match = DirectiveScanner.match(text, len: text.length, at: 0,
-                                           registry: DirectiveRegistry(directives: [FontDirective()]))
+                                           registry: DirectiveRegistry(directives: [SizedDirective()]))
         #expect(match?.bodyRange.map { text.substring(with: $0) } == "a \\} b")
     }
 
@@ -292,7 +292,7 @@ struct DirectiveParserTests {
     @Test("markers coexist")
     func markersCoexist() {
         let registry = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(
-            directives: [FontDirective(), BackslashDirective()]
+            directives: [SizedDirective(), BackslashDirective()]
         ))
         #expect(ids("@font(size: 18){a} and \\bigger{b}", registry) == ["font", "bigger"])
     }
@@ -313,22 +313,22 @@ struct DirectiveParserTests {
     func fingerprintTracksDirectives() {
         let without = ExtensionRegistry(extensions: [HighlightExtension()])
         let with = ExtensionRegistry(extensions: [HighlightExtension()],
-                                     directives: DirectiveRegistry(directives: [FontDirective()]))
+                                     directives: DirectiveRegistry(directives: [SizedDirective()]))
         #expect(without.fingerprint != with.fingerprint)
     }
 
     @Test("an equal directive set produces an equal fingerprint")
     func fingerprintIsStable() {
-        let a = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [FontDirective()]))
-        let b = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [FontDirective()]))
+        let a = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [SizedDirective()]))
+        let b = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [SizedDirective()]))
         #expect(a.fingerprint == b.fingerprint)
     }
 
     @Test("changing the marker changes the fingerprint")
     func fingerprintTracksMarker() {
-        let atSign = DirectiveRegistry(directives: [FontDirective()],
+        let atSign = DirectiveRegistry(directives: [SizedDirective()],
                                        settings: DirectiveRegistrySettings(defaultMarker: "@"))
-        let slash = DirectiveRegistry(directives: [FontDirective()],
+        let slash = DirectiveRegistry(directives: [SizedDirective()],
                                       settings: DirectiveRegistrySettings(defaultMarker: "/"))
         #expect(atSign.fingerprint != slash.fingerprint)
     }
@@ -341,8 +341,43 @@ struct DirectiveParserTests {
 
     @Test("a directive-only registry is not empty")
     func directiveOnlyRegistryIsNotEmpty() {
-        let registry = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [FontDirective()]))
+        let registry = ExtensionRegistry(extensions: [], directives: DirectiveRegistry(directives: [SizedDirective()]))
         #expect(!registry.isEmpty)
         #expect(!registry.fingerprint.isEmpty)
     }
+
+    // MARK: - Known limitation: pre-claimed spans in a body
+
+    /// A body holding a span claimed by an EARLIER pass rejects the whole
+    /// directive. Pinned deliberately: this is the documented limitation, and
+    /// the follow-up that lifts it should flip these, not delete them.
+    @Test("a code span in the body keeps the whole directive literal")
+    func codeSpanInBodyRejects() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        let nodes = InlineParser.parse("@font(size: 18){a `b` c}", registry: registry)
+        #expect(!nodes.contains { if case .ext = $0 { return true }; return false })
+    }
+
+    @Test("a backslash escape in the body keeps the whole directive literal")
+    func escapeInBodyRejects() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        let nodes = InlineParser.parse(#"@font(size: 18){a \* c}"#, registry: registry)
+        #expect(!nodes.contains { if case .ext = $0 { return true }; return false })
+    }
+
+    /// The limitation is specific to spans claimed BEFORE this pass. Anything
+    /// claimed in the same pass or later composes normally, so the rejection
+    /// rule is narrower than "no other construct in a body".
+    @Test("inline math, links and emphasis all compose inside a body")
+    func samePassConstructsInBodyCompose() {
+        let registry = MarkdownEditorConfiguration(directives: [SizedDirective()]).extensionRegistry
+        for source in ["@font(size: 18){a $x^2$ c}",
+                       "@font(size: 18){a [l](u) c}",
+                       "@font(size: 18){a *b* c}"] {
+            let nodes = InlineParser.parse(source, registry: registry)
+            #expect(nodes.contains { if case .ext = $0 { return true }; return false },
+                    "expected a directive for \(source)")
+        }
+    }
+
 }
