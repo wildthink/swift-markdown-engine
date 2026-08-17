@@ -29,9 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ColorDirective` ship as opt-in reference directives, off by default like the
   bundled extensions. `MarkdownHTMLRenderer.html(from:extensions:directives:)`
   takes the registered set so rich copy matches what is on screen.
-- `NativeTextViewWrapper.onTextMutation` reports exact, completed native edits
-  for embedders that maintain their own source authority or mirror edits into
-  another presentation.
+- **Directive glyph presentation**: a self-contained call (`@marker`,
+  `@glyph(star.fill)`) collapses its source behind an SF Symbol, replacement
+  text, or an image supplied by the directive's `presentation`, and reveals the
+  real characters again under the caret. The source is never removed from the
+  storage — it collapses to zero width the same way inline LaTeX does — so
+  selection, find, copy, and undo still see it. `Demo/` gains `@icon`, `@flag`,
+  `@emoji`, and `@pagebreak` as embedder-side directives — anything carrying
+  curated data or document policy is an app concern, not an engine primitive.
 
 ### Changed
 - An ordered list's painted number no longer reverts to the source digit under
