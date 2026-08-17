@@ -301,7 +301,16 @@ enum InlineParser {
         // rejected outright, so a code span or a backslash escape in the body
         // keeps the whole directive literal — see the known limitation in
         // `DirectiveScanner`.
-        if let match = DirectiveScanner.match(ns, len: len, at: i, registry: registry.directives) {
+        //
+        // The emptiness test is HOISTED here rather than left to the identical
+        // guard inside `match`. This runs per unclaimed character, and `match`
+        // is too large to inline: the call, the indirect return buffer for a
+        // ~200-byte `DirectiveMatch?` and an outlined ARC helper all execute
+        // before the callee's own guard is reached. Measured on a release
+        // build, that cost a document registering NO directives 12-19% of its
+        // parse stage for a feature it never turned on.
+        if !registry.directives.isEmpty,
+           let match = DirectiveScanner.match(ns, len: len, at: i, registry: registry.directives) {
             return .ext(id: match.nodeID, range: match.range, contentRange: match.contentRange,
                         markers: match.markers, parsesContent: match.parsesContent)
         }
