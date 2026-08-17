@@ -419,32 +419,6 @@ ordinary characters — the core grammar has never heard of them.
 /// with whatever it encloses, in both directions. That is why directives are
 /// scoped to a body instead of running "from here on": the effect lives in the
 /// tree, not in the document position.
-private let directiveSection = """
-## Directives — named, with typed arguments
-
-`config.directives = [FontDirective(), ColorDirective()]`
-
-A pair of delimiters can't carry a name and parameters, so this is the second \
-seam rather than more of the first. Sizes can be absolute — \
-@font(size: 24){twenty-four point} — or relative to the surrounding text: \
-@font(size: 0.75em){three-quarter em} and @font(size: 150%){one-and-a-half}.
-
-Composition is the whole idea. Inside a directive, markup keeps the \
-directive's size: @font(size: 20){**bold**, *italic*, and ***both***}. Outside, \
-the directive keeps its context — the same call in a heading stays bold:
-
-### Headings compose too: @font(size: 28){bigger, still a heading}
-
-Colours work the same way, and directives nest: @color(red){red text}, \
-@color(blue){blue text}, and @font(size: 22){@color(purple){big and purple}}.
-
-Put the caret inside any directive to reveal its source; move away and the \
-syntax collapses back to just the styled text — exactly like every other marker.
-
-Registered names ONLY, which is what makes the `@` marker safe over an existing \
-corpus: @notregistered(x){y} is literal text right now, and an address like \
-jason@wildthink.com never opens a directive at all.
-"""
 
 /// Directive seam demo: `@font(…){…}` and `@color(…){…}` are supplied by the
 /// opt-in `FontDirective` and `ColorDirective` registered above.
@@ -460,8 +434,7 @@ private let directiveSection = """
 The other opt-in seam: named inline commands with typed arguments, for \
 constructs that need a name and parameters rather than delimiters. \
 Unregistered, `@anything` stays literal text — and a bare `@` in prose or an \
-address like jason@example
-.com never opens one.
+address like jason@example.com never opens one.
 
 Sizes can be absolute — @font(size: 24){twenty-four point} — or relative to the \
 surrounding text: @font(size: 0.75em){three-quarter em} and @font(size: 150%){one-and-a-half}.
