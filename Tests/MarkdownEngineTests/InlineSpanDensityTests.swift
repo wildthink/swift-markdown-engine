@@ -128,8 +128,13 @@ struct InlineSpanDensityTests {
     /// pairwise containment takes it to 33.9x. The bound sits in that gap, and
     /// unlike the wall-clock version it means the same thing everywhere —
     /// these are integers derived from the input, not timings.
-    private func expectLinearWork(_ label: String, _ make: (Int) -> String) {
-        let registry = MarkdownEditorConfiguration(extensions: [HighlightExtension()]).extensionRegistry
+    private func expectLinearWork(
+        _ label: String,
+        registry: ExtensionRegistry = MarkdownEditorConfiguration(
+            extensions: [HighlightExtension()]
+        ).extensionRegistry,
+        _ make: (Int) -> String
+    ) {
         let small = cost(paragraph(40, make), registry: registry)
         let large = cost(paragraph(240, make), registry: registry)
 
@@ -151,6 +156,40 @@ struct InlineSpanDensityTests {
 
     @Test("highlights: parse WORK is linear in spans per paragraph")
     func highlightWork() { expectLinearWork("highlight") { "==word\($0)==" } }
+
+    // MARK: - Directives
+
+    /// Directives landed after this suite was written (#120), and they are a
+    /// claimed-span producer like any other.
+    ///
+    /// Each shape pairs the directive with a CODE SPAN deliberately. A
+    /// paragraph of bare `@mk` claims nothing in passes 1-2, so `ClaimedIndex`
+    /// is built empty and a pairwise scan over it is free — the assertion then
+    /// holds no matter what the cursor does, and only `buildTree` is really
+    /// under test. The code span gives the index something to scan, so these
+    /// cover BOTH structures. Verified by restoring the pre-rewrite pairwise
+    /// containment: with the code span they fail, without it they pass.
+    private struct CountedMarker: MarkdownDirective {
+        var syntax: DirectiveSyntax { DirectiveSyntax(name: "mk", form: .selfContained) }
+    }
+
+    private struct CountedBox: MarkdownDirective {
+        var syntax: DirectiveSyntax { DirectiveSyntax(name: "bx", form: .container) }
+    }
+
+    private var directiveRegistry: ExtensionRegistry {
+        MarkdownEditorConfiguration(directives: [CountedMarker(), CountedBox()]).extensionRegistry
+    }
+
+    @Test("self-contained directives: parse WORK is linear in spans per paragraph")
+    func selfContainedDirectiveWork() {
+        expectLinearWork("directive/self-contained", registry: directiveRegistry) { "`c\($0)` @mk" }
+    }
+
+    @Test("container directives: parse WORK is linear in spans per paragraph")
+    func containerDirectiveWork() {
+        expectLinearWork("directive/container", registry: directiveRegistry) { "`c\($0)` @bx{w\($0)}" }
+    }
 
     @Test("a paragraph mixing claimed-span kinds does linear work")
     func mixedWork() {
