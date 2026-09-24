@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `valueCompletions` already answers anything the declared schema can — closed
   keyword sets and booleans — so a directive implements it only when its domain
   is dynamic or too large to declare.
+- `Extras/MarkdownEngineSwaTex` — an opt-in `LatexRenderer` (`SwaTexBridge`)
+  backed by [SwaTex](https://github.com/PhraseHQ/SwaTex), a pure-Swift
+  KaTeX-compatible engine. Covers KaTeX's full support table plus mhchem
+  (`\ce{…}`), which the SwiftMath bridge renders as source text. It is a
+  separate package rather than a root product because SwaTex needs macOS 15,
+  and SwiftPM would apply that floor to the whole engine package. The engine
+  itself stays on macOS 14. The demo app links it (and so targets macOS 15).
 
 ### Fixed
 - A programmatic content swap — a document switch, or the SwiftUI `text` binding

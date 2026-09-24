@@ -71,6 +71,7 @@ The package ships three library products — add only what you need:
 | `MarkdownEngine` | You want the editor only. Zero external dependencies. |
 | `MarkdownEngineCodeBlocks` | You want the full visual code-block experience — background fill, monospace font, and syntax highlighting — without writing your own bridge. Pulls in [HighlighterSwift](https://github.com/smittytone/HighlighterSwift) transitively. See [Customization → Code Blocks](#code-blocks). |
 | `MarkdownEngineLatex` | You want LaTeX formula rendering without writing your own bridge. Pulls in [SwiftMath](https://github.com/mgriebling/SwiftMath) transitively. See [Customization → LaTeX Rendering](#latex-rendering). |
+| `MarkdownEngineSwaTex` | You want LaTeX rendering on macOS 15+ with wider syntax coverage (full KaTeX table, `\ce{…}` chemistry). Lives in a **separate package** at `Extras/MarkdownEngineSwaTex` — see [SwaTex alternative](#swatex-alternative). |
 
 ## Quick Start
 
@@ -174,6 +175,34 @@ configuration.services = MarkdownEditorServices(
 The bridge uses the Latin Modern math font and tints formulas with
 `MarkdownEditorTheme.latexLightModeText` / `latexDarkModeText`. Pass
 `singleLetterPaddingBottom:` to override the engine's matching default.
+
+#### SwaTex alternative
+
+`Extras/MarkdownEngineSwaTex` ships `SwaTexBridge`, a drop-in `LatexRenderer`
+backed by [SwaTex](https://github.com/PhraseHQ/SwaTex) — a pure-Swift,
+KaTeX-compatible engine (no WebView, no JavaScript). Compared with the
+SwiftMath bridge it covers the full KaTeX support table plus mhchem `\ce{…}`,
+and typesets uncached formulas several times faster. It renders with the KaTeX
+fonts, so strokes are slightly heavier and formulas slightly wider.
+
+It is a **separate package** because SwaTex requires macOS 15 and Swift 6.1,
+and SwiftPM applies a dependency's platform floor to the whole package —
+putting it in this manifest would raise the engine's floor for everyone.
+
+```swift
+// Package.swift of your app (macOS 15+)
+.package(path: "path/to/swift-markdown-engine/Extras/MarkdownEngineSwaTex")
+// …
+.product(name: "MarkdownEngineSwaTex", package: "MarkdownEngineSwaTex")
+```
+
+```swift
+import MarkdownEngineSwaTex
+
+configuration.services = MarkdownEditorServices(latex: SwaTexBridge())
+```
+
+Unparseable formulas return `nil`, so the editor falls back to the source text.
 
 ### Theming
 

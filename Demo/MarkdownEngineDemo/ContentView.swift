@@ -18,6 +18,9 @@ import MarkdownEngineCodeBlocks
 #if canImport(MarkdownEngineLatex)
 import MarkdownEngineLatex
 #endif
+#if canImport(MarkdownEngineSwaTex)
+import MarkdownEngineSwaTex
+#endif
 
 struct ContentView: View {
     @State private var text: String = sampleMarkdown
@@ -257,7 +260,12 @@ struct ContentView: View {
         config.services.syntaxHighlighter = HighlighterSwiftBridge()
         #endif
 
-        #if canImport(MarkdownEngineLatex)
+        #if canImport(MarkdownEngineSwaTex)
+        // LaTeX rendering via SwaTex (pure-Swift KaTeX engine; needs macOS 15).
+        // Preferred over the SwiftMath bridge when both are linked — swap the
+        // two branches to compare them side by side.
+        config.services.latex = SwaTexBridge()
+        #elseif canImport(MarkdownEngineLatex)
         // LaTeX rendering for `$inline$` and `$$block$$` math. Uses the
         // Latin Modern math font and tints formulas to match the theme.
         config.services.latex = SwiftMathBridge()
