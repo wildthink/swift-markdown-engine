@@ -8,10 +8,11 @@
 //
 //      configuration.directives = [FontDirective(), ColorDirective()]
 //
-//  Both are PURE PRESENTATION — a font transform and a colour. Directives that
-//  carry curated data (icons, flags, emoji) or encode document policy (page
-//  breaks) are app concerns, not engine primitives, so they belong to the
-//  embedder; `Demo/` shows what those look like.
+//  Both are PURE PRESENTATION — a font transform and a colour. Both are
+//  containers, so neither draws a glyph; directives that carry curated data
+//  (icons, flags, emoji) or encode document policy (page breaks) are app
+//  concerns, not engine primitives, so they belong to the embedder. `Demo/`
+//  shows what those look like.
 //
 
 import AppKit
@@ -87,25 +88,6 @@ public struct FontDirective: MarkdownDirective {
     }
 }
 
-// MARK: - Shared colour resolution
-
-/// Standard colour names resolved without an asset catalog, so
-/// `@color(red){…}` works with no setup. An unlisted name falls back to
-/// `NSColor(named:)`, so an embedder's own palette entries keep working.
-enum DirectivePalette {
-    static let named: [String: NSColor] = [
-        "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow,
-        "green": .systemGreen, "mint": .systemMint, "teal": .systemTeal,
-        "cyan": .systemCyan, "blue": .systemBlue, "indigo": .systemIndigo,
-        "purple": .systemPurple, "pink": .systemPink, "brown": .systemBrown,
-        "gray": .systemGray, "grey": .systemGray,
-    ]
-
-    static func color(_ name: String) -> NSColor? {
-        named[name.lowercased()] ?? NSColor(named: name)
-    }
-}
-
 // MARK: - @color(red){…}  — container, positional argument
 
 public struct ColorDirective: MarkdownDirective {
@@ -115,6 +97,17 @@ public struct ColorDirective: MarkdownDirective {
     public init() {}
 
     public var id: String { Self.identifier }
+
+    /// Standard colour names, resolved without an asset catalog so
+    /// `@color(red){…}` works out of the box. An unlisted name falls back to
+    /// `NSColor(named:)`, so embedders can add their own palette entries.
+    private static let named: [String: NSColor] = [
+        "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow,
+        "green": .systemGreen, "mint": .systemMint, "teal": .systemTeal,
+        "cyan": .systemCyan, "blue": .systemBlue, "indigo": .systemIndigo,
+        "purple": .systemPurple, "pink": .systemPink, "brown": .systemBrown,
+        "gray": .systemGray, "grey": .systemGray,
+    ]
 
     public var syntax: DirectiveSyntax {
         DirectiveSyntax(
@@ -145,7 +138,7 @@ public struct ColorDirective: MarkdownDirective {
         guard let name = arguments.positional.first?.asString else { return .inherit }
         // An unresolvable name leaves the body alone rather than guessing —
         // the source stays readable and the mistake is visible.
-        guard let color = DirectivePalette.color(name) else { return .inherit }
+        guard let color = Self.named[name.lowercased()] ?? NSColor(named: name) else { return .inherit }
         return DirectiveStyle(attributes: [.foregroundColor: color])
     }
 

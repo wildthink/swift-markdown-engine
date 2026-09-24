@@ -7,7 +7,7 @@ Sources/
 ├── MarkdownEngine/                          # core target — zero deps
 │   ├── Configuration/                       # MarkdownEditorConfiguration + MarkdownEditorTheme
 │   ├── Extensions/                          # the extension seam: MarkdownExtension + bundled opt-ins
-│   ├── Directives/                          # the directive seam: @font(size: 18){…} — parsing, glyphs, completion
+│   ├── Directives/                          # the directive seam: @font(size: 18){…} — parsing, styling, glyphs, completion
 │   ├── Services/                            # 4 protocols, no-op defaults, WikiLinkService
 │   ├── Parser/                              # two-phase AST: BlockParser → InlineParser → DocumentAST (+ token projection)
 │   ├── Styling/                             # MarkdownASTStyler (AST walk) + MarkdownStyler facade for NSImage passes
@@ -153,7 +153,8 @@ produce a partial construct.
 directive NAME (`@fo|`) or one of its ARGUMENT VALUES (`@icon(sta|`). It cannot
 use the AST: mid-typing, `@ico` and `@icon(sta` are precisely what the parser
 REJECTS, so it is a separate, forgiving backwards scan over the current line,
-bounded to 256 characters per caret move.
+bounded to 256 characters per caret move. It reuses the parser's boundary rule,
+so it can never offer a directive the parser would refuse.
 
 The engine owns the CANDIDATES because it owns the registry — names come from
 the registered directives, values from `MarkdownDirective.valueCompletions`,

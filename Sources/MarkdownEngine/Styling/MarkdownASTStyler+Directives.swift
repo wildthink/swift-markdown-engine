@@ -2,9 +2,12 @@
 //  MarkdownASTStyler+Directives.swift
 //  MarkdownEngine
 //
-//  Phase 2 of the directive seam: a container directive's body picks up the
-//  directive's style, and — the part that matters — its font TRANSFORM
-//  composes over the font inherited at that point in the tree.
+//  The styling half of the directive seam, in two parts.
+//
+//  A CONTAINER directive's body picks up the directive's style, and — the part
+//  that matters — its font TRANSFORM composes over the font inherited at that
+//  point in the tree. A SELF-CONTAINED call has no body to style; it draws a
+//  glyph in place of its own source instead (see `presentSelfContained`).
 //
 //  That composition is why directives are tree-shaped. The styler already
 //  threads a font down the walk (heading font → +bold → +italic); a directive
@@ -33,7 +36,7 @@ extension MarkdownASTStyler {
     /// case the caller falls through to ordinary extension-span handling.
     ///
     /// Self-contained calls return their inherited font unchanged: they have
-    /// no body, and their glyph presentation lands in Phase 3.
+    /// no body, and are handed to the glyph pass instead.
     static func directiveBodyFont(
         for node: ExtensionInlineNode,
         font: NSFont,
@@ -163,7 +166,7 @@ extension MarkdownASTStyler {
             attrs.append((restRange, [
                 .foregroundColor: NSColor.clear,
                 .font: markerFont,
-                .kern: -HeadingHelpers.textWidth(restText, font: markerFont),
+                .kern: -MarkdownStyler.hiddenRunKern(restText, font: markerFont),
             ]))
         }
     }

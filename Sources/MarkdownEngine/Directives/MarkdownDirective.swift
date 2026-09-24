@@ -11,11 +11,11 @@
 //  Two forms, both TREE-SHAPED — a directive's effect never escapes its own
 //  node:
 //
-//    * self-contained — `@pagebreak`, `@date(format: iso)`. A leaf.
+//    * self-contained — `@pagebreak`, `@date(format: iso)`. A leaf, drawn as
+//      a glyph in place of its own source.
 //    * container      — `@font(size: 18){text}`. The body is re-parsed as
-//      markdown and (from Phase 2) styled with the directive's font transform
-//      COMPOSED over the inherited font, so `@font(size: 18){**bold**}` is
-//      bold AND 18pt.
+//      markdown and styled with the directive's font transform COMPOSED over
+//      the inherited font, so `@font(size: 18){**bold**}` is bold AND 18pt.
 //
 //  There is deliberately no "applies to everything after me" form. That would
 //  make styling depend on document position rather than tree position, which
@@ -251,8 +251,8 @@ public struct DirectiveStyle {
 /// LaTeX uses), and the glyph is drawn by `MarkdownTextLayoutFragment`.
 /// "Markers shrink, they don't disappear" still holds.
 public enum DirectivePresentation {
-    /// Style the source text only — no glyph. The default, and the only
-    /// behaviour wired up in Phase 1.
+    /// Style the source text only — no glyph. The default, and what a
+    /// directive falls back to when its glyph can't be produced.
     case literal
     /// An SF Symbol drawn at the directive's position.
     case symbol(name: String, tint: NSColor?)
@@ -261,6 +261,14 @@ public enum DirectivePresentation {
     /// storage, so the source characters survive for selection and undo.
     case text(String)
     /// A pre-rendered image; `baselineOffset` matches the LaTeX convention.
+    ///
+    /// Drawn at its own `image.size` — unlike `.symbol`/`.text`, which are
+    /// always fit to `DirectiveContext.inheritedFont`, this case is not
+    /// resized to the surrounding line. An image taller than the inherited
+    /// font's line will overdraw neighbouring lines. Sizing it (typically
+    /// to `inheritedFont.ascender - inheritedFont.descender`, or larger by
+    /// deliberate choice, e.g. a thumbnail) is the directive's
+    /// responsibility.
     case image(NSImage, baselineOffset: CGFloat)
 }
 
