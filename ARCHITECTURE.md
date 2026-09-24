@@ -23,8 +23,12 @@ Sources/
 │   └── MarkdownEngine.docc/                 # DocC catalog
 ├── MarkdownEngineCodeBlocks/                # opt-in SPM product — pulls in HighlighterSwift
 │   └── HighlighterSwiftBridge.swift         # SyntaxHighlighter conformance
-└── MarkdownEngineLatex/                     # opt-in SPM product — pulls in SwiftMath
-    └── SwiftMathBridge.swift                # LatexRenderer conformance
+├── MarkdownEngineLatex/                     # opt-in SPM product — pulls in SwiftMath
+│   └── SwiftMathBridge.swift                # LatexRenderer conformance
+Extras/
+└── MarkdownEngineSwaTex/                    # opt-in, SEPARATE package (macOS 15) — pulls in SwaTex
+    └── Sources/MarkdownEngineSwaTex/
+        └── SwaTexBridge.swift               # LatexRenderer conformance
 ```
 
 The rest of this file is a per-directory tour, in the order text flows
