@@ -57,13 +57,13 @@ Non-negotiable for the core `MarkdownEngine` target:
 - **Don't add external dependencies to the core `MarkdownEngine`
   target.** App-specific behaviors plug in through the four service
   protocols (`WikiLinkResolver`, `EmbeddedImageProvider`,
-  `SyntaxHighlighter`, `LatexRenderer`) instead. The two existing
-  bridge products (`MarkdownEngineCodeBlocks` → HighlighterSwift,
-  `MarkdownEngineLatex` → SwiftMath) are the deliberate exception so
-  consumers can opt in. `Extras/MarkdownEngineSwaTex` (→ SwaTex) is a
-  separate package because its dependency needs macOS 15, and a root
-  product would raise the engine's floor for everyone. A new bridge or a new core dependency is a bigger
-  call — make the case in the PR description.
+  `SyntaxHighlighter`, `LatexRenderer`) instead. The two root bridge products
+  (`MarkdownEngineCodeBlocks` → HighlighterSwift, `MarkdownEngineLatex` →
+  SwiftMath) are deliberate exceptions so consumers can opt in.
+  `Extras/MarkdownEngineSwaTex` is the supported macOS 15+ math bridge and
+  remains a separate package so its dependency cannot raise the engine's
+  deployment floor for everyone. A new bridge or a new core dependency is a
+  bigger call — make the case in the PR description.
 - **New constructs are extensions, not core grammar.** A construct like
   `==highlight==` (inline) or a `::: … :::` fenced block belongs in
   `Sources/MarkdownEngine/Extensions/` as a `MarkdownExtension` — see

@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separate package rather than a root product because SwaTex needs macOS 15,
   and SwiftPM would apply that floor to the whole engine package. The engine
   itself stays on macOS 14. The demo app links it (and so targets macOS 15).
+  SwaTex is pinned to 0.5.0 and is the recommended renderer for macOS 15+
+  applications; SwiftMath remains available for macOS 14 compatibility.
 
 ### Fixed
 - A programmatic content swap — a document switch, or the SwiftUI `text` binding
