@@ -9,7 +9,7 @@ import MarkdownEngine
 import MarkdownEngineSwaTex
 
 @MainActor
-@Suite("SwaTexBridge")
+@Suite("SwaTexBridge", .serialized)
 struct SwaTexBridgeTests {
     private let bridge = SwaTexBridge()
 
@@ -67,5 +67,24 @@ struct SwaTexBridgeTests {
         bridge.clearCache()
         let c = try #require(render(#"a^2+b^2=c^2"#))
         #expect(a.image !== c.image)
+    }
+
+    @Test("Rapid valid and malformed edits never reuse a stale rendered result")
+    func rapidChangingInput() {
+        for index in 0..<100 {
+            #expect(render("x_{\(index)}^2") != nil)
+            #expect(render(#"\frac{a}{"#) == nil)
+        }
+    }
+
+    @Test("Five hundred distinct equations render for the scrolling stress fixture")
+    func fiveHundredEquationStressFixture() {
+        var rendered = 0
+        for index in 0..<500 {
+            if render("x_{\(index)}^2 + y_{\(index)}^2 = z_{\(index)}^2") != nil {
+                rendered += 1
+            }
+        }
+        #expect(rendered == 500)
     }
 }
