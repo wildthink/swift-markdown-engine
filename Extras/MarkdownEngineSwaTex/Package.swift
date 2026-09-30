@@ -17,7 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "swift-markdown-engine", path: "../.."),
-        .package(url: "https://github.com/PhraseHQ/SwaTex.git", from: "0.5.0"),
+        .package(url: "https://github.com/PhraseHQ/SwaTex.git", exact: "0.5.0"),
     ],
     targets: [
         .target(

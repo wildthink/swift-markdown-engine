@@ -11,6 +11,16 @@ import SwaTex
 import SwaTexRender
 import MarkdownEngine
 
+/// An opt-in native ``LatexRenderer`` backed by SwaTex 0.5.0.
+///
+/// The bridge converts SwaTex display lists to `NSImage` values expected by
+/// MarkdownEngine's existing TextKit renderer. Markdown source remains the
+/// canonical document representation; parsed trees, display lists, and images
+/// are derived state only.
+///
+/// Invalid or incomplete LaTeX returns `nil`, which tells MarkdownEngine to
+/// leave the literal source visible and editable. Rendered images are cached by
+/// source, math mode, font size, resolved color, and display scale.
 public final class SwaTexBridge: LatexRenderer, @unchecked Sendable {
     private struct CacheKey: Hashable {
         let latex: String
@@ -23,8 +33,12 @@ public final class SwaTexBridge: LatexRenderer, @unchecked Sendable {
     private var cache: [CacheKey: LatexRenderResult] = [:]
     private let lock = NSLock()
 
+    /// Creates a renderer with an empty in-memory image cache.
     public init() {}
 
+    /// Clears the bridge's rendered-image cache.
+    ///
+    /// SwaTex's shared parse/layout cache is independent and is not cleared.
     public func clearCache() {
         lock.lock(); cache.removeAll(); lock.unlock()
     }
