@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `Extras/MarkdownEngineSwaTex` — an opt-in `LatexRenderer` (`SwaTexBridge`)
+  backed by [SwaTex](https://github.com/PhraseHQ/SwaTex), a pure-Swift
+  KaTeX-compatible engine. Covers KaTeX's full support table plus mhchem
+  (`\ce{…}`), which the SwiftMath bridge renders as source text. It is a
+  separate package rather than a root product because SwaTex needs macOS 15,
+  and SwiftPM would apply that floor to the whole engine package. The engine
+  itself stays on macOS 14. The demo app links it (and so targets macOS 15).
+  SwaTex is pinned to 0.5.0 and is the recommended renderer for macOS 15+
+  applications; SwiftMath remains available for macOS 14 compatibility.
+
+## [0.14.0] - 2026-10-04
+
+### Added
 - `SpellCheckingPolicy.automaticQuoteSubstitution` (default `true`, unchanged behavior) lets embedders editing raw Markdown/LaTeX source keep straight `'` and `"`; smart quotes were forced on at creation and re-enabled on every caret move out of a code/LaTeX/link span. The Smart Quotes menu toggle is now captured like the spelling toggles.
 - **Directive glyph presentation**: a self-contained call (`@marker`,
   `@glyph(star.fill)`) collapses its source behind an SF Symbol, replacement
@@ -25,17 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `valueCompletions` already answers anything the declared schema can — closed
   keyword sets and booleans — so a directive implements it only when its domain
   is dynamic or too large to declare.
-- `Extras/MarkdownEngineSwaTex` — an opt-in `LatexRenderer` (`SwaTexBridge`)
-  backed by [SwaTex](https://github.com/PhraseHQ/SwaTex), a pure-Swift
-  KaTeX-compatible engine. Covers KaTeX's full support table plus mhchem
-  (`\ce{…}`), which the SwiftMath bridge renders as source text. It is a
-  separate package rather than a root product because SwaTex needs macOS 15,
-  and SwiftPM would apply that floor to the whole engine package. The engine
-  itself stays on macOS 14. The demo app links it (and so targets macOS 15).
-  SwaTex is pinned to 0.5.0 and is the recommended renderer for macOS 15+
-  applications; SwiftMath remains available for macOS 14 compatibility.
 
 ### Fixed
+- Nested lists keep their levels both ways: copied out as nested HTML/RTF
+  instead of one flat list, and read back from WebKit's sibling-sublist shape
+  (Mail, Notes) instead of dropping its items. Task boxes render with the list
+  helpers turned off.
 - A trackpad held against the top or bottom of the editor no longer flickers.
   AppKit applies a scroll on the next display refresh, after `scrollWheel(with:)`
   has returned, so the clamp there only ever corrected the PREVIOUS event — with
