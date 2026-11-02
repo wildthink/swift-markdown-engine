@@ -16,7 +16,7 @@ description — that gets you an answer faster than describing it in prose.
 git clone https://github.com/nodes-app/swift-markdown-engine.git
 cd swift-markdown-engine
 swift build
-swift test
+swift test --no-parallel
 ```
 
 Open `Package.swift` in Xcode for a graphical environment. The runnable
@@ -48,7 +48,8 @@ Screen recordings welcome.
   `Tests/MarkdownEngineTests/`
 - DocC comments for any public-API change; update `Demo/` if relevant
 - One-line entry in `CHANGELOG.md` under `[Unreleased]`
-- `swift build` and `swift test` must be green; CI runs the same checks
+- `swift build` and `swift test --no-parallel` must be green; CI runs the same checks.
+  Run in parallel, the suite has crashed inside AppKit on an unchanged `main` too (#175)
 
 ## Design constraints
 
@@ -57,13 +58,13 @@ Non-negotiable for the core `MarkdownEngine` target:
 - **Don't add external dependencies to the core `MarkdownEngine`
   target.** App-specific behaviors plug in through the four service
   protocols (`WikiLinkResolver`, `EmbeddedImageProvider`,
-  `SyntaxHighlighter`, `LatexRenderer`) instead. The two root bridge products
-  (`MarkdownEngineCodeBlocks` → HighlighterSwift, `MarkdownEngineLatex` →
-  SwiftMath) are deliberate exceptions so consumers can opt in.
-  `Extras/MarkdownEngineSwaTex` is the supported macOS 15+ math bridge and
-  remains a separate package so its dependency cannot raise the engine's
-  deployment floor for everyone. A new bridge or a new core dependency is a
-  bigger call — make the case in the PR description.
+  `SyntaxHighlighter`, `LatexRenderer`) instead. The two existing
+  bridge products (`MarkdownEngineCodeBlocks` → a bundled highlight.js,
+  `MarkdownEngineLatex` → SwiftMath) are the deliberate exception so
+  consumers can opt in. `Extras/MarkdownEngineSwaTex` is the supported
+  macOS 15+ math bridge and remains a separate package so its dependency
+  cannot raise the engine's deployment floor for everyone. A new bridge or a
+  new core dependency is a bigger call — make the case in the PR description.
 - **New constructs are extensions, not core grammar.** A construct like
   `==highlight==` (inline) or a `::: … :::` fenced block belongs in
   `Sources/MarkdownEngine/Extensions/` as a `MarkdownExtension` — see
