@@ -108,6 +108,33 @@ public struct NoOpEmbeddedImageProvider: EmbeddedImageProvider {
     public func fingerprint() -> AnyHashable { 0 }
 }
 
+// MARK: - Link Icons
+
+/// Supplies the small icon drawn before a Markdown link's text — typically
+/// the target site's favicon, or a file's Finder icon for a local link.
+///
+/// The icon is drawing only: the engine leaves room for it with kern on the
+/// link's hidden opening `[` and paints it in the layout fragment. Nothing is
+/// inserted into the text, so the document, selection, copy and save are
+/// untouched. It shows only while the link's syntax is hidden.
+///
+/// Called on the main thread while styling, for every hidden link in the
+/// restyled range, so it must be fast: answer from what's already at hand and
+/// never fetch. Return a template image (`isTemplate == true`) for a
+/// one-colour glyph that should take the link's colour.
+public protocol LinkIconProvider: Sendable {
+    /// The icon for a link's destination, or `nil` for none. `url` is the
+    /// destination exactly as written, so a relative one (`notes.md`) comes
+    /// without a scheme for the embedder to resolve against its document.
+    func icon(for url: URL) -> NSImage?
+}
+
+/// Default provider: no icons.
+public struct NoOpLinkIconProvider: LinkIconProvider {
+    public init() {}
+    public func icon(for url: URL) -> NSImage? { nil }
+}
+
 // MARK: - Syntax Highlighting
 
 /// Provides code-block font, background color, and syntax highlighting.
@@ -342,6 +369,8 @@ public struct MarkdownEditorServices: Sendable {
     public var images: any EmbeddedImageProvider
     public var syntaxHighlighter: any SyntaxHighlighter
     public var latex: any LatexRenderer
+    /// Icons drawn before links' text. Defaults to none.
+    public var linkIcons: any LinkIconProvider
     public var bus: MarkdownEditorBus
 
     public init(
@@ -349,12 +378,14 @@ public struct MarkdownEditorServices: Sendable {
         images: any EmbeddedImageProvider = NoOpEmbeddedImageProvider(),
         syntaxHighlighter: any SyntaxHighlighter = PlainTextSyntaxHighlighter(),
         latex: any LatexRenderer = NoOpLatexRenderer(),
+        linkIcons: any LinkIconProvider = NoOpLinkIconProvider(),
         bus: MarkdownEditorBus = .default
     ) {
         self.wikiLinks = wikiLinks
         self.images = images
         self.syntaxHighlighter = syntaxHighlighter
         self.latex = latex
+        self.linkIcons = linkIcons
         self.bus = bus
     }
 

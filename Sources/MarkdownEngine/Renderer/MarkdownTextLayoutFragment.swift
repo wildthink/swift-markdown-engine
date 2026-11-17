@@ -117,6 +117,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         // 2. LaTeX images (behind text — hidden markers are invisible anyway)
         drawLatexImages(at: point, in: context)
 
+        // 2b. Link icons, in the room kerned open before each hidden link's text
+        drawLinkIcons(at: point, in: context)
+
         // 3. Normal text
         super.draw(at: point, in: context)
 
@@ -493,6 +496,37 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                                   width: imageBounds.width, height: imageBounds.height)
             }
             image.draw(in: drawRect)
+        }
+    }
+
+    // MARK: - Link Icons
+
+    /// Where each link icon in this fragment lands, in the space `draw(at:)` works in.
+    /// Split from the drawing so placement is assertable headlessly.
+    func linkIconRects(at point: CGPoint) -> [(image: NSImage, rect: CGRect)] {
+        guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return [] }
+        var out: [(image: NSImage, rect: CGRect)] = []
+        ts.enumerateAttribute(.linkIcon, in: range, options: []) { value, attrRange, _ in
+            guard let image = value as? NSImage,
+                  let bounds = (ts.attribute(.linkIconBounds, at: attrRange.location, effectiveRange: nil) as? NSValue)?.rectValue,
+                  let pos = drawPosition(forDocumentCharAt: attrRange.location, point: point) else { return }
+            out.append((image, CGRect(x: pos.x, y: pos.baselineY + bounds.origin.y - bounds.height,
+                                      width: bounds.width, height: bounds.height)))
+        }
+        return out
+    }
+
+    private func drawLinkIcons(at point: CGPoint, in context: CGContext) {
+        let icons = linkIconRects(at: point)
+        guard !icons.isEmpty else { return }
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        let nsContext = NSGraphicsContext(cgContext: context, flipped: true)
+        nsContext.imageInterpolation = .high
+        NSGraphicsContext.current = nsContext
+        for icon in icons {
+            icon.image.draw(in: icon.rect, from: .zero, operation: .sourceOver, fraction: 1,
+                            respectFlipped: true, hints: nil)
         }
     }
 

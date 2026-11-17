@@ -907,10 +907,8 @@ enum MarkdownASTStyler {
         children: [InlineNode], font: NSFont, ctx: Ctx, into attrs: inout [StyledRange]
     ) {
         attrs.append((range, [.spellingState: 0]))
-        var urlString = ctx.ns.substring(with: urlRange)
-        if !urlString.contains("://") { urlString = "https://\(urlString)" }
         let isActive = ctx.isActive(range)
-        if let url = URL(string: urlString) {
+        if let url = linkURL(urlRange, ctx: ctx) {
             if isActive {
                 attrs.append((textRange, [
                     .foregroundColor: ctx.theme.link.withAlphaComponent(ctx.config.link.activeLinkAlpha),
@@ -957,9 +955,10 @@ enum MarkdownASTStyler {
     private static func shrinkInactiveMarkers(in blocks: [BlockNode], ctx: Ctx, into attrs: inout [StyledRange]) {
         for block in blocks where ctx.inScope(block.range) {
             switch block {
-            case .heading(_, let range, let markers, let inlines):
+            case .heading(let level, let range, let markers, let inlines):
                 if !ctx.isActive(range) { shrink(markers, ctx: ctx, into: &attrs) }
-                shrinkInlineMarkers(inlines, ctx: ctx, into: &attrs)
+                let size = ctx.baseFont.pointSize * ctx.config.headings.fontMultiplier(for: level)
+                shrinkInlineMarkers(inlines, ctx: ctx, fontSize: size, into: &attrs)
             case .paragraph(_, let inlines), .blockquote(_, let inlines):
                 shrinkInlineMarkers(inlines, ctx: ctx, into: &attrs)
             case .list(_, let items):
@@ -974,18 +973,20 @@ enum MarkdownASTStyler {
     }
 
     /// Shrink inactive markers; an active ancestor reveals its whole subtree via `forceReveal`.
-    private static func shrinkInlineMarkers(_ nodes: [InlineNode], ctx: Ctx, forceReveal: Bool = false, into attrs: inout [StyledRange]) {
+    /// `fontSize` is the size of the text the nodes sit in — it sizes link icons.
+    private static func shrinkInlineMarkers(_ nodes: [InlineNode], ctx: Ctx, forceReveal: Bool = false,
+                                            fontSize: CGFloat? = nil, into attrs: inout [StyledRange]) {
         for node in nodes {
             switch node {
             case .emphasis(_, let range, let markers, let children):
                 let active = forceReveal || ctx.isActive(range)
                 if !active { shrink(markers, ctx: ctx, into: &attrs) }
-                shrinkInlineMarkers(children, ctx: ctx, forceReveal: active, into: &attrs)
+                shrinkInlineMarkers(children, ctx: ctx, forceReveal: active, fontSize: fontSize, into: &attrs)
             case .ext(let node):
                 let active = forceReveal || ctx.isActive(node.range)
                 if !active { shrink(node.markers, ctx: ctx, into: &attrs) }
-                shrinkInlineMarkers(node.children, ctx: ctx, forceReveal: active, into: &attrs)
-            case .link(let range, _, _, let markers, let children):
+                shrinkInlineMarkers(node.children, ctx: ctx, forceReveal: active, fontSize: fontSize, into: &attrs)
+            case .link(let range, _, let urlRange, let markers, let children):
                 let active = forceReveal || ctx.isActive(range)
                 if !active {
                     shrink(markers, ctx: ctx, into: &attrs)
@@ -994,8 +995,13 @@ enum MarkdownASTStyler {
                                            length: NSMaxRange(markers[3]) - markers[2].location)
                         attrs.append((hide, [.font: ctx.inlineMarkerFont, .foregroundColor: NSColor.clear]))
                     }
+                    // After `shrink`, so its kern on the `[` gives way to the icon's room.
+                    if let opener = markers.first {
+                        placeLinkIcon(opener: opener, url: urlRange,
+                                      fontSize: fontSize ?? ctx.baseFont.pointSize, ctx: ctx, into: &attrs)
+                    }
                 }
-                shrinkInlineMarkers(children, ctx: ctx, forceReveal: active, into: &attrs)
+                shrinkInlineMarkers(children, ctx: ctx, forceReveal: active, fontSize: fontSize, into: &attrs)
             case .wikiLink(let range, _, _, let markers):
                 if !(forceReveal || ctx.isActive(range)) { shrink(markers, ctx: ctx, into: &attrs) }
             case .image(let range, _, _, let markers):
@@ -1006,6 +1012,38 @@ enum MarkdownASTStyler {
                 break   // own marker handling / not shrunk
             }
         }
+    }
+
+    /// A link's destination as the `.link` attribute has it: a bare
+    /// `example.com` gets an `https://` scheme.
+    private static func linkURL(_ urlRange: NSRange, ctx: Ctx) -> URL? {
+        var urlString = ctx.ns.substring(with: urlRange)
+        if !urlString.contains("://") { urlString = "https://\(urlString)" }
+        return URL(string: urlString)
+    }
+
+    // MARK: - Link icons
+
+    /// Give a hidden link the icon `services.linkIcons` has for its destination.
+    ///
+    /// The text is never touched: the link's (already shrunk) opening `[`
+    /// carries the image and enough kern to make room for it, and
+    /// `MarkdownTextLayoutFragment` paints it there — the same channel a
+    /// self-contained directive's glyph uses. With the caret in the link the
+    /// syntax is revealed and the icon goes away with the rest of the hiding.
+    private static func placeLinkIcon(opener: NSRange, url urlRange: NSRange, fontSize: CGFloat,
+                                      ctx: Ctx, into attrs: inout [StyledRange]) {
+        guard opener.length == 1, ctx.ns.character(at: opener.location) == 0x5B /* [ */,
+              let url = URL(string: ctx.ns.substring(with: urlRange).trimmingCharacters(in: .whitespaces)),
+              let icon = ctx.config.services.linkIcons.icon(for: url) else { return }
+        let font = NSFont(name: ctx.fontName, size: fontSize) ?? .systemFont(ofSize: fontSize)
+        let geometry = LinkIconGeometry(font: font)
+        let image = icon.isTemplate ? LinkIconGeometry.tinted(icon, with: ctx.theme.link) : icon
+        attrs.append((opener, [
+            .linkIcon: image,
+            .linkIconBounds: NSValue(rect: geometry.bounds),
+            .kern: geometry.advance - HeadingHelpers.textWidth("[", font: ctx.inlineMarkerFont),
+        ]))
     }
 
     private static func shrink(_ markers: [NSRange], ctx: Ctx, into attrs: inout [StyledRange]) {
